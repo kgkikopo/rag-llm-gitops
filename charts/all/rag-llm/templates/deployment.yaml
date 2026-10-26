@@ -43,7 +43,7 @@ spec:
           {{- end }}
           {{- end }}
             - name: APP_TITLE
-              value: Talk with your documentation
+              value: Talk with your documentation (CI/CD Test)
             - name: EMBEDDING_MODEL
               value: {{ .Values.global.model.embedding }}
           {{- if eq .Values.global.db.type "REDIS" }}
