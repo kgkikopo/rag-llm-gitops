@@ -8,15 +8,15 @@ llm_providers:
         url: {{ printf "https://vllm-inference-service-predictor-%s.%s/v1" .Release.Namespace .Values.global.localClusterDomain }}
         params:
           - name: max_new_tokens
-            value: 1024
+            value: 4096
           - name: temperature
-            value: 0.01
+            value: 1.0
           - name: top_k
-            value: 10
+            value: 64
           - name: top_p
             value: 0.95
           - name: repetition_penalty
-            value: 1.03
+            value: 1.0
           - name: verbose
             value: False
           - name: typical_p

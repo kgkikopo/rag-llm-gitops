@@ -1,6 +1,6 @@
 global:
   model:
-    vllm: ibm-granite/granite-3.3-8b-instruct
+    vllm: google/gemma-3-4b-it
 
 vllmInferenceService:
   annotations:
@@ -40,10 +40,10 @@ vllmServingRuntime:
   args:
     - "--model=/cache/models"
     - "--distributed-executor-backend=mp"
-    - "--max-model-len=4096"
+    - "--max-model-len=65536"
     - "--dtype=half"
     - "--gpu-memory-utilization"
-    - "0.98"
+    - "0.90"
     - "--enforce-eager"
 
   command:

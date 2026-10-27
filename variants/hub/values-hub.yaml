@@ -36,14 +36,6 @@ clusterGroup:
       name: gpu-operator-certified
       namespace: nvidia-gpu-operator
       source: certified-operators
-    edb:
-      name: cloud-native-postgresql
-      namespace: openshift-operators
-      source: certified-operators
-    elastic:
-      name: elasticsearch-eck-operator-certified
-      namespace: rag-llm
-      source: certified-operators
     rhoai:
       name: rhods-operator
       namespace: redhat-ods-operator

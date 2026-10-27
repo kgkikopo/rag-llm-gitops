@@ -18,8 +18,8 @@ global:
     type: PGVECTOR
   # Models used by the inference service (should be a HuggingFace model ID)
   model:
-    vllm: ibm-granite/granite-3.3-8b-instruct
-    embedding: sentence-transformers/all-mpnet-base-v2
+    vllm: google/gemma-3-4b-it
+    embedding: Qwen/Qwen3-Embedding-0.6B
 
   storageClass: gp3-csi
 

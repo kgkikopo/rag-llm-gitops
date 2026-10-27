@@ -3,10 +3,10 @@ global:
   hubClusterDomain: example.com
   db:
     index: docs
-    type: EDB
+    type: PGVECTOR
   model:
-    vllm: ibm-granite/granite-3.3-8b-instruct
-    embedding: sentence-transformers/all-mpnet-base-v2
+    vllm: google/gemma-3-4b-it
+    embedding: Qwen/Qwen3-Embedding-0.6B
     storageClass: gp3-csi
 
 llmui:
@@ -175,23 +175,21 @@ populateDbJob:
   tempDir: /docs
   logLevel: info
   repoSources:
-    - repo: https://github.com/RHEcosystemAppEng/llm-on-openshift.git
+    - repo: https://github.com/openshift/openshift-docs.git
+      branch: enterprise-4.22
       globs:
-        - examples/notebooks/langchain/rhods-doc/*.pdf
-  webSources:
-    - https://ai-on-openshift.io/getting-started/openshift/
-    - https://ai-on-openshift.io/getting-started/opendatahub/
-    - https://ai-on-openshift.io/getting-started/openshift-ai/
-    - https://ai-on-openshift.io/odh-rhoai/configuration/
-    - https://ai-on-openshift.io/odh-rhoai/custom-notebooks/
-    - https://ai-on-openshift.io/odh-rhoai/nvidia-gpus/
-    - https://ai-on-openshift.io/odh-rhoai/custom-runtime-triton/
-    - https://ai-on-openshift.io/odh-rhoai/openshift-group-management/
-    - https://ai-on-openshift.io/tools-and-applications/minio/minio/
+        - cli_reference/**/*.adoc
+        - applications/**/*.adoc
+        - networking/**/*.adoc
+        - operators/**/*.adoc
+        - storage/**/*.adoc
+        - authentication/**/*.adoc
+        - security/**/*.adoc
+  webSources: []
   chunking:
-    size: 1024
-    overlap: 40
-  embeddingModel: sentence-transformers/all-mpnet-base-v2
+    size: 2048
+    overlap: 200
+  embeddingModel: Qwen/Qwen3-Embedding-0.6B
 
 
   # By default, fullname uses '{{ .Release.Name }}-{{ .Chart.Name }}'. This

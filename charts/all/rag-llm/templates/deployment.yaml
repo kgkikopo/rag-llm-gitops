@@ -43,7 +43,7 @@ spec:
           {{- end }}
           {{- end }}
             - name: APP_TITLE
-              value: Talk with your documentation (CI/CD Test)
+              value: OpenShift 4.22 Documentation Assistant
             - name: EMBEDDING_MODEL
               value: {{ .Values.global.model.embedding }}
           {{- if eq .Values.global.db.type "REDIS" }}
