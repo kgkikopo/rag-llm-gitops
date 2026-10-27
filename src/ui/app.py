@@ -348,7 +348,7 @@ with gr.Blocks(title=APP_TITLE, css=custom_css) as demo:
 
     with gr.Tabs():
         with gr.TabItem("Documentation Assistant"):
-            chatbot = gr.Chatbot(type="messages", height=520, show_label=False)
+            chatbot = gr.Chatbot(height=520, show_label=False)
             with gr.Row():
                 msg_input = gr.Textbox(
                     placeholder="Ask a question about OpenShift 4.22 (e.g., How do I configure edge TLS termination for a route?)...",
