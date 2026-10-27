@@ -11,3 +11,6 @@ common/scripts/pattern-util.sh
 tests/ci/.results
 tests/ci/__pycache__
 tests/ci/.pytest_cache
+__pycache__/
+*.pyc
+*.pyo

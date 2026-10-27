@@ -67,7 +67,8 @@ Gemma-3-4B uses a hybrid sliding window attention mechanism (local layers at 1,0
 2. **`charts/all/rag-llm`**:
    - **`pgvector`**: PostgreSQL deployment with the `pgvector` extension.
    - **`populate-vectordb` Job**: Clones `openshift/openshift-docs` (`enterprise-4.22`), chunks markdown/adoc sources (chunk size: 2048, overlap: 200), computes embeddings, and stores them in PostgreSQL.
-   - **`llm-ui`**: Gradio-based web interface with chat and comparison modes.
+   - **`llm-ui`**: Gradio-based web interface with chat and comparison modes, built in-cluster via OpenShift `BuildConfig`.
+3. **`src/ui`**: Application source code (`app.py`, `Containerfile`, `requirements.txt`) containing the custom Gradio interface.
 
 ---
 

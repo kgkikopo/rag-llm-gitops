@@ -1,0 +1,36 @@
+{{- if .Values.ui.build.enabled }}
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: rag-llm-ui
+  labels:
+    {{- include "rag-llm.labels" . | nindent 4 }}
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: rag-llm-ui
+  labels:
+    {{- include "rag-llm.labels" . | nindent 4 }}
+spec:
+  output:
+    to:
+      kind: ImageStreamTag
+      name: rag-llm-ui:latest
+  source:
+    type: Git
+    git:
+      uri: {{ .Values.global.repoURL | default "https://github.com/kgkikopo/rag-llm-gitops.git" }}
+      ref: {{ .Values.global.targetRevision | default "main" }}
+    contextDir: src/ui
+  strategy:
+    type: Docker
+    dockerStrategy:
+      dockerfilePath: Containerfile
+  triggers:
+    - type: ConfigChange
+    - type: ImageChange
+{{- end }}

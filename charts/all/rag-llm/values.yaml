@@ -21,6 +21,10 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: latest
 
+ui:
+  build:
+    enabled: true
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
@@ -125,7 +129,7 @@ volumeMounts:
   - name: providerconfig
     mountPath: /opt/app-root/config
   - name: cache-volume
-    mountPath: /opt/app-root/src/assets/proposal-docs
+    mountPath: /tmp/.cache
 # - name: foo
 #   mountPath: "/etc/foo"
 #   readOnly: true

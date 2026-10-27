@@ -84,8 +84,13 @@ spec:
               value: {{ .Values.global.db.index }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if .Values.ui.build.enabled }}
+          image: "rag-llm-ui:latest"
+          imagePullPolicy: Always
+          {{- else }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

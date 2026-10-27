@@ -1,0 +1,26 @@
+FROM registry.access.redhat.com/ubi9/python-311:latest
+
+WORKDIR /opt/app-root/src
+
+ENV PYTHONUNBUFFERED=1 \
+    GRADIO_SERVER_NAME="0.0.0.0" \
+    GRADIO_SERVER_PORT="7860" \
+    HF_HOME="/tmp/.cache" \
+    HUGGINGFACE_HUB_CACHE="/tmp/.cache" \
+    TORCH_HOME="/tmp/.cache"
+
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Copy application source
+COPY app.py .
+
+# OpenShift arbitrary user permissions (group 0)
+RUN chgrp -R 0 /opt/app-root && \
+    chmod -R g=u /opt/app-root
+
+EXPOSE 7860
+
+CMD ["python", "app.py"]
