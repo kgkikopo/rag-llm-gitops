@@ -116,26 +116,43 @@ def retrieve_docs(query: str, top_k: int = 4):
 
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Check if collections table exists
+                # Check for langchain-postgres v2 direct table (e.g. "docs")
                 cur.execute("""
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables 
-                        WHERE table_name = 'langchain_pg_collection'
+                        WHERE table_name = %s
                     );
-                """)
-                if not cur.fetchone()[0]:
-                    return [], "Database tables not yet initialized. The documentation ingestion job may still be running."
+                """, (COLLECTION_NAME,))
+                if cur.fetchone()[0]:
+                    sql = f"""
+                        SELECT content, langchain_metadata, (embedding <=> %s::vector) AS distance
+                        FROM "{COLLECTION_NAME}"
+                        ORDER BY distance ASC
+                        LIMIT %s;
+                    """
+                    cur.execute(sql, (query_embedding, top_k))
+                    rows = cur.fetchall()
+                else:
+                    # Check legacy langchain_pg_collection schema
+                    cur.execute("""
+                        SELECT EXISTS (
+                            SELECT FROM information_schema.tables 
+                            WHERE table_name = 'langchain_pg_collection'
+                        );
+                    """)
+                    if not cur.fetchone()[0]:
+                        return [], f"Database table '{COLLECTION_NAME}' not yet created. The documentation ingestion job may still be running."
 
-                sql = """
-                    SELECT e.document, e.cmetadata, (e.embedding <=> %s::vector) AS distance
-                    FROM langchain_pg_embedding e
-                    JOIN langchain_pg_collection c ON e.collection_id = c.uuid
-                    WHERE c.name = %s
-                    ORDER BY distance ASC
-                    LIMIT %s;
-                """
-                cur.execute(sql, (query_embedding, COLLECTION_NAME, top_k))
-                rows = cur.fetchall()
+                    sql = """
+                        SELECT e.document, e.cmetadata, (e.embedding <=> %s::vector) AS distance
+                        FROM langchain_pg_embedding e
+                        JOIN langchain_pg_collection c ON e.collection_id = c.uuid
+                        WHERE c.name = %s
+                        ORDER BY distance ASC
+                        LIMIT %s;
+                    """
+                    cur.execute(sql, (query_embedding, COLLECTION_NAME, top_k))
+                    rows = cur.fetchall()
 
                 docs = []
                 for doc_text, metadata, dist in rows:
@@ -287,10 +304,22 @@ def check_status():
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT count(*) FROM langchain_pg_embedding;")
-                count = cur.fetchone()[0]
-                status.append(f"PGVector Database: Connected (Host: {DB_HOST}, Port: {DB_PORT}, DB: {DB_NAME})")
-                status.append(f"Indexed Documentation Chunks: {count}")
+                # Check for direct collection table (langchain-postgres v2)
+                cur.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = %s);", (COLLECTION_NAME,))
+                if cur.fetchone()[0]:
+                    cur.execute(f'SELECT count(*) FROM "{COLLECTION_NAME}";')
+                    count = cur.fetchone()[0]
+                    status.append(f"PGVector Database: Connected (Host: {DB_HOST}, Port: {DB_PORT}, DB: {DB_NAME})")
+                    status.append(f"Indexed Documentation Chunks in '{COLLECTION_NAME}': {count}")
+                else:
+                    cur.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'langchain_pg_embedding');")
+                    if cur.fetchone()[0]:
+                        cur.execute("SELECT count(*) FROM langchain_pg_embedding;")
+                        count = cur.fetchone()[0]
+                        status.append(f"PGVector Database: Connected (Host: {DB_HOST}, Port: {DB_PORT}, DB: {DB_NAME})")
+                        status.append(f"Indexed Documentation Chunks: {count}")
+                    else:
+                        status.append(f"PGVector Database: Connected, but table '{COLLECTION_NAME}' not yet created (ingestion in progress).")
     except Exception as e:
         status.append(f"PGVector Database: Error ({e})")
 
