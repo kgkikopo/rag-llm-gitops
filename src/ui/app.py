@@ -178,11 +178,33 @@ def retrieve_docs(query: str, top_k: int = 4):
         return [], str(e)
 
 # --- LLM Invocation ---
+def find_working_vllm_url() -> str:
+    global VLLM_URL
+    candidates = [
+        "http://vllm-inference-service-predictor:8080/v1",
+        "http://vllm-inference-service-predictor.rag-llm.svc.cluster.local:8080/v1",
+        "http://vllm-inference-service-predictor:80/v1",
+        VLLM_URL
+    ]
+    seen = set()
+    for u in candidates:
+        if u and u not in seen:
+            seen.add(u)
+            try:
+                r = requests.get(f"{u.rstrip('/')}/models", timeout=2, verify=False)
+                if r.status_code == 200:
+                    logger.info(f"Verified working vLLM endpoint: {u}")
+                    VLLM_URL = u
+                    return u
+            except Exception:
+                continue
+    return VLLM_URL
+
 def get_active_model_name() -> str:
     global MODEL_NAME
-    # 1. Attempt to query vLLM's /v1/models endpoint to get the exact served ID
+    base_url = find_working_vllm_url()
     try:
-        r = requests.get(f"{VLLM_URL.rstrip('/')}/models", timeout=3)
+        r = requests.get(f"{base_url.rstrip('/')}/models", timeout=3, verify=False)
         if r.status_code == 200:
             data = r.json().get("data", [])
             if data and "id" in data[0]:
@@ -190,14 +212,14 @@ def get_active_model_name() -> str:
                 return MODEL_NAME
     except Exception:
         pass
-    # 2. Fallback: strip organization prefix if present (google/gemma-3-4b-it -> gemma-3-4b-it)
     if "/" in MODEL_NAME:
         return MODEL_NAME.split("/")[-1]
     return MODEL_NAME
 
 def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
     """Calls vLLM OpenAI-compatible chat completions endpoint."""
-    url = f"{VLLM_URL.rstrip('/')}/chat/completions"
+    target_url = find_working_vllm_url()
+    url = f"{target_url.rstrip('/')}/chat/completions"
     active_model = get_active_model_name()
     payload = {
         "model": active_model,
@@ -207,19 +229,28 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
         "max_tokens": max_tokens
     }
     try:
-        resp = requests.post(url, json=payload, timeout=120)
+        resp = requests.post(url, json=payload, timeout=120, verify=False)
         resp.raise_for_status()
         data = resp.json()
         return data["choices"][0]["message"]["content"]
     except requests.exceptions.ConnectionError:
+        # Fallback to internal DNS if external route failed
+        fallback = "http://vllm-inference-service-predictor:8080/v1/chat/completions"
+        if url != fallback:
+            try:
+                resp = requests.post(fallback, json=payload, timeout=120)
+                resp.raise_for_status()
+                data = resp.json()
+                return data["choices"][0]["message"]["content"]
+            except Exception:
+                pass
         return f"[Connection Error] Unable to connect to inference service at {url}. The vLLM model pod may still be starting or downloading model weights."
     except Exception as e:
-        # If the active model returned 404, attempt fallback to alternate model name format
         alt_model = MODEL_NAME if active_model != MODEL_NAME else active_model.split("/")[-1]
         if alt_model != active_model:
             try:
                 payload["model"] = alt_model
-                resp = requests.post(url, json=payload, timeout=120)
+                resp = requests.post(url, json=payload, timeout=120, verify=False)
                 resp.raise_for_status()
                 data = resp.json()
                 return data["choices"][0]["message"]["content"]

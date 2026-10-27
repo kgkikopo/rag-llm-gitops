@@ -5,7 +5,7 @@ llm_providers:
       - name: {{ (split "/" .Values.global.model.vllm)._1 }}
         weight: 1
         enabled: True
-        url: {{ printf "https://vllm-inference-service-predictor-%s.%s/v1" .Release.Namespace .Values.global.localClusterDomain }}
+        url: "http://vllm-inference-service-predictor:8080/v1"
         params:
           - name: max_new_tokens
             value: 4096
