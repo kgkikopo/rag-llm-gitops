@@ -23,6 +23,70 @@ spec:
         fsGroup: {{ .Values.populateDbJob.securityContext.fsGroup }}
         {{- end }}
     {{- end }}
+      initContainers:
+      - name: clear-vectordb
+        image: "{{ .Values.populateDbJob.image.repository }}:{{ .Values.populateDbJob.image.tag }}"
+        imagePullPolicy: {{ .Values.populateDbJob.image.pullPolicy }}
+        env:
+        - name: DB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: vectordb-app
+              key: username
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: vectordb-app
+              key: password
+        - name: DB_HOST
+          valueFrom:
+            secretKeyRef:
+              name: vectordb-app
+              key: host
+        - name: DB_PORT
+          valueFrom:
+            secretKeyRef:
+              name: vectordb-app
+              key: port
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: vectordb-app
+              key: dbname
+        - name: PGVECTOR_COLLECTION_NAME
+          value: {{ .Values.global.db.index }}
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            python3 - << 'PY'
+            import os, sys, time, psycopg
+
+            user = os.environ.get("DB_USERNAME", "postgres")
+            password = os.environ.get("DB_PASS", "postgres")
+            host = os.environ.get("DB_HOST", "pgvector")
+            port = os.environ.get("DB_PORT", "5432")
+            dbname = os.environ.get("DB_NAME", "rag_blueprint")
+            collection = os.environ.get("PGVECTOR_COLLECTION_NAME", "docs")
+
+            print(f"[Init] Connecting to {dbname} at {host}:{port} as {user}...")
+            for attempt in range(1, 11):
+                try:
+                    with psycopg.connect(
+                        host=host, port=port, dbname=dbname, user=user, password=password, autocommit=True, connect_timeout=5
+                    ) as conn:
+                        with conn.cursor() as cur:
+                            print(f"[Init] Dropping table if exists: {collection}")
+                            cur.execute(f'DROP TABLE IF EXISTS "{collection}" CASCADE;')
+                            cur.execute("DROP TABLE IF EXISTS langchain_pg_embedding CASCADE;")
+                            cur.execute("DROP TABLE IF EXISTS langchain_pg_collection CASCADE;")
+                            cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+                            print("[Init] Vector database table cleared successfully.")
+                            sys.exit(0)
+                except Exception as e:
+                    print(f"[Init] Attempt {attempt}/10: {e}")
+                    time.sleep(2)
+            sys.exit(1)
+            PY
       containers:
       - image: "{{ .Values.populateDbJob.image.repository }}:{{ .Values.populateDbJob.image.tag }}"
         imagePullPolicy: {{ .Values.populateDbJob.image.pullPolicy }}
