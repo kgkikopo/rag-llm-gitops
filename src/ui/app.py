@@ -181,8 +181,9 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
 
 # --- Chat Assistant Logic ---
 def chat_respond(user_message: str, chat_history: list):
-    if not user_message.strip():
-        return "", chat_history
+    history = list(chat_history) if chat_history else []
+    if not user_message or not user_message.strip():
+        return "", history
 
     docs, error_msg = retrieve_docs(user_message, top_k=4)
 
@@ -208,9 +209,16 @@ def chat_respond(user_message: str, chat_history: list):
         )
 
     messages = [{"role": "system", "content": system_prompt}]
-    for h in chat_history[-3:]:  # Keep recent context
-        messages.append({"role": "user", "content": h[0]})
-        messages.append({"role": "assistant", "content": h[1]})
+    for item in history[-6:]:
+        if isinstance(item, dict):
+            role = item.get("role", "user")
+            content = item.get("content", "")
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+        elif isinstance(item, (list, tuple)) and len(item) == 2:
+            messages.append({"role": "user", "content": str(item[0])})
+            messages.append({"role": "assistant", "content": str(item[1])})
+
     messages.append({"role": "user", "content": user_message})
 
     answer = call_llm(messages)
@@ -224,8 +232,9 @@ def chat_respond(user_message: str, chat_history: list):
         else:
             formatted_answer = answer
 
-    chat_history.append((user_message, formatted_answer))
-    return "", chat_history
+    history.append({"role": "user", "content": user_message})
+    history.append({"role": "assistant", "content": formatted_answer})
+    return "", history
 
 # --- Comparison Logic ---
 def compare_query(query: str):
@@ -310,7 +319,7 @@ with gr.Blocks(title=APP_TITLE, css=custom_css) as demo:
 
     with gr.Tabs():
         with gr.TabItem("Documentation Assistant"):
-            chatbot = gr.Chatbot(height=520, show_label=False)
+            chatbot = gr.Chatbot(type="messages", height=520, show_label=False)
             with gr.Row():
                 msg_input = gr.Textbox(
                     placeholder="Ask a question about OpenShift 4.22 (e.g., How do I configure edge TLS termination for a route?)...",
