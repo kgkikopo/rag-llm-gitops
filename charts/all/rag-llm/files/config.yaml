@@ -22,6 +22,6 @@ llm_providers:
           - name: typical_p
             value: 0.95
 default_provider: "OpenShift AI (vLLM)"
-default_model: {{ .Values.global.model.vllm }}
+default_model: {{ (split "/" .Values.global.model.vllm)._1 }}
 # type values=(default, round_robin,  all)
 type: all

@@ -75,7 +75,9 @@ if os.path.exists(CONFIG_FILE):
                                         MAX_TOKENS = int(p.get("value", 4096))
                                 break
             if cfg and "default_model" in cfg and cfg["default_model"]:
-                MODEL_NAME = cfg["default_model"]
+                default_m = cfg["default_model"]
+                # Prefer short name without org prefix (e.g. gemma-3-4b-it) to match vLLM served model
+                MODEL_NAME = default_m.split("/")[-1] if "/" in default_m else default_m
         logger.info(f"Loaded config from {CONFIG_FILE}: URL={VLLM_URL}, Model={MODEL_NAME}")
     except Exception as e:
         logger.warning(f"Failed to parse {CONFIG_FILE} ({e}), using default LLM settings.")
@@ -176,11 +178,29 @@ def retrieve_docs(query: str, top_k: int = 4):
         return [], str(e)
 
 # --- LLM Invocation ---
+def get_active_model_name() -> str:
+    global MODEL_NAME
+    # 1. Attempt to query vLLM's /v1/models endpoint to get the exact served ID
+    try:
+        r = requests.get(f"{VLLM_URL.rstrip('/')}/models", timeout=3)
+        if r.status_code == 200:
+            data = r.json().get("data", [])
+            if data and "id" in data[0]:
+                MODEL_NAME = data[0]["id"]
+                return MODEL_NAME
+    except Exception:
+        pass
+    # 2. Fallback: strip organization prefix if present (google/gemma-3-4b-it -> gemma-3-4b-it)
+    if "/" in MODEL_NAME:
+        return MODEL_NAME.split("/")[-1]
+    return MODEL_NAME
+
 def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
     """Calls vLLM OpenAI-compatible chat completions endpoint."""
     url = f"{VLLM_URL.rstrip('/')}/chat/completions"
+    active_model = get_active_model_name()
     payload = {
-        "model": MODEL_NAME,
+        "model": active_model,
         "messages": messages,
         "temperature": TEMPERATURE,
         "top_p": TOP_P,
@@ -194,6 +214,17 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
     except requests.exceptions.ConnectionError:
         return f"[Connection Error] Unable to connect to inference service at {url}. The vLLM model pod may still be starting or downloading model weights."
     except Exception as e:
+        # If the active model returned 404, attempt fallback to alternate model name format
+        alt_model = MODEL_NAME if active_model != MODEL_NAME else active_model.split("/")[-1]
+        if alt_model != active_model:
+            try:
+                payload["model"] = alt_model
+                resp = requests.post(url, json=payload, timeout=120)
+                resp.raise_for_status()
+                data = resp.json()
+                return data["choices"][0]["message"]["content"]
+            except Exception:
+                pass
         return f"[Error] LLM request failed: {e}"
 
 # --- Chat Assistant Logic ---
