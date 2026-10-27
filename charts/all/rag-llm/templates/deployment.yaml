@@ -46,17 +46,6 @@ spec:
               value: OpenShift 4.22 Documentation Assistant
             - name: EMBEDDING_MODEL
               value: {{ .Values.global.model.embedding }}
-          {{- if eq .Values.global.db.type "REDIS" }}
-            - name: DB_TYPE
-              value: REDIS
-            - name: REDIS_URL
-              value: redis://redis-stack-server:6379
-            - name: REDIS_INDEX
-              value: {{ .Values.global.db.index }}
-            - name: REDIS_SCHEMA
-              value: redis_schema.yaml
-          {{- end }}
-          {{- if or (eq .Values.global.db.type "EDB") (eq .Values.global.db.type "PGVECTOR") }}
             - name: DB_TYPE
               value: PGVECTOR
             - name: DB_USERNAME
@@ -93,44 +82,6 @@ spec:
               value: 'postgresql+psycopg://$(DB_USERNAME):$(DB_PASS)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)'
             - name: PGVECTOR_COLLECTION_NAME
               value: {{ .Values.global.db.index }}
-          {{- end }}
-          {{- if eq .Values.global.db.type "ELASTIC" }}
-            - name: DB_TYPE
-              value: "ELASTIC"
-            - name: ELASTIC_INDEX
-              value: {{ .Values.global.db.index }}
-            - name: ELASTIC_URL
-              value: "http://es-vectordb-es-http:9200"
-            - name: ELASTIC_USER
-              value: "elastic"
-            - name: ELASTIC_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: es-vectordb-es-elastic-user
-                  key: elastic
-          {{- end }}
-          {{- if eq .Values.global.db.type "MSSQL" }}
-            - name: DB_TYPE
-              value: MSSQL
-            - name: MSSQL_CONNECTION_STRING
-              valueFrom:
-                secretKeyRef:
-                  name: mssql-secret
-                  key: CONNECTION_STRING
-            - name: MSSQL_TABLE
-              value: {{ .Values.global.db.index }}
-          {{- end }}
-          {{- if eq .Values.global.db.type "AZURESQL" }}
-            - name: DB_TYPE
-              value: MSSQL
-            - name: MSSQL_CONNECTION_STRING
-              valueFrom:
-                secretKeyRef:
-                  name: azuresql-secret
-                  key: CONNECTION_STRING
-            - name: MSSQL_TABLE
-              value: {{ .Values.global.db.index }}
-          {{- end }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"

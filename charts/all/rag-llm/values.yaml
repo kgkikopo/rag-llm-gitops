@@ -112,13 +112,6 @@ volumes:
     configMap:
       name: providerconfig
       defaultMode: 420
-  - name: redis-schema
-    configMap:
-      name: redis-schema
-      items:
-        - key: redis_schema.yaml
-          path: redis_schema.yaml
-      defaultMode: 420
   - name: cache-volume
     emptyDir:
       sizeLimit: 5Gi
@@ -131,9 +124,6 @@ volumes:
 volumeMounts:
   - name: providerconfig
     mountPath: /opt/app-root/config
-  - name: redis-schema
-    mountPath: /opt/app-root/src/redis_schema.yaml
-    subPath: redis_schema.yaml
   - name: cache-volume
     mountPath: /opt/app-root/src/assets/proposal-docs
 # - name: foo

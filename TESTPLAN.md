@@ -3,55 +3,43 @@
 - [Provisioning of GPU Node](https://github.com/validatedpatterns-sandbox/rag-llm-gitops/blob/main/GPU_provisioning.md)
 
   - MachineSet is created.
-    - Name of the machine set <clustername>-gpu-<AWSregion>. This should not be a hard requirement though.
-    - Machine set has taint section
+    - Name of the machine set `<clustername>-gpu-<AWSregion>`.
+    - Machine set has taint section:
 
       ```yaml
       taints:
         - effect: NoSchedule
-          key: odh-notebook  <--- Use own taint name or skip all together
+          key: odh-notebook
           value: 'true'
       ```
 
-    - MachineSet has a label
+    - MachineSet has a label:
 
       ```yaml
        metadata:
          labels:
-           node-role.kubernetes.io/odh-notebook: '' <--- Put your label if needed
+           node-role.kubernetes.io/odh-notebook: ''
       ```
 
-    - MachineSet instance type
+    - MachineSet instance type:
 
       ```yaml
        providerSpec:
          value:
-         ........................
-         instanceType: g5.2xlarge <---- Change vm type if needed
+           instanceType: g4dn.xlarge # or g5.2xlarge
       ```
 
-    - The nodes are provisioned with the proper label. The number of pods running should be greater than 20.
-      ![labeled nodes](https://validatedpatterns.io/images/rag-llm-gitops/ragllm-label-nodes.png)
-
-    - NVIDIA pods should be running on the nodes. Check the pods running on the GPU nodes.
-      ![nvidia pods](https://validatedpatterns.io/images/rag-llm-gitops/ragllm-pattern-running-pods.png)
+    - The nodes are provisioned with the proper label.
+    - NVIDIA pods should be running on the nodes.
 
   - Verify Node Feature Discovery Operator is installed:
-    - Select Installed Operators from the left Navigation Bar and under Projects, select All Projects. Node Discover Feature Operator should be installed
-      ![nfd operator](https://validatedpatterns.io/images/rag-llm-gitops/ragllm-nfd-operator.png)
-
+    - Select Installed Operators from the left Navigation Bar and under Projects, select All Projects. Node Feature Discovery Operator should be installed.
     - Click on the Node Feature Discovery Operator. Under NodeFeatureDiscovery an instance should be created. Status should be Available.
-      ![nfd instance](https://validatedpatterns.io/images/rag-llm-gitops/ragllm-nfd-instance.png)
 
-  - Verify NVIDIA GPU Operator is installed.
-    - NVIDIA GPU Operator is installed
-
-      ![nvidia operator](https://validatedpatterns.io/images/rag-llm-gitops/ragllm-nvidia-operator.png)
-
-    - Click on the NVIDIA GPU Operator and click on ClusterPolicy. A gpu-cluster-policy should exist
-      ![nvidia clusterpolicies](https://validatedpatterns.io/images/rag-llm-gitops/ragllm-nvidia-clusterpolicies.png)
-
-    - Click on the gpu-cluster-policy and click on the YAML tab. The YAML should contain the tolerations
+  - Verify NVIDIA GPU Operator is installed:
+    - NVIDIA GPU Operator is installed.
+    - Click on the NVIDIA GPU Operator and click on ClusterPolicy. A `gpu-cluster-policy` should exist.
+    - The YAML should contain the tolerations:
 
       ```yaml
        tolerations:
@@ -60,36 +48,24 @@
            value: 'true'
       ```
 
-- Application provisioned correctly.
-  - Click on the rag-llm namespace
+- Application provisioned correctly:
+  - Check the `rag-llm` namespace:
+    - PGVector PostgreSQL pod is running (`pgvector-postgresql-...`).
+    - Documentation population job completes successfully (`populate-vectordb-...`).
+    - Assistant UI pod is running (`llm-ui-...`).
+  - Check the `vllm` namespace:
+    - vLLM model server pod is running with GPU allocation (`hf-text-generation-server-...`).
+  - Access the UI:
+    - Click on **Networking** → **Routes** in the `rag-llm` namespace. The `llm-ui` route should exist.
+    - Click on the Location URL to launch the **OpenShift 4.22 Documentation Assistant**.
 
-    - By Default, EDB Operator will be deployed, which will deploy PGVECTOR vector database, 6 pods should be running
-      ![ragllm pgvector pods](https://validatedpatterns.io/images/rag-llm-gitops/rag-llm-pgvector.png)
-
-    - If the global.db.type is set to REDIS in the values-global.yaml, four pods should be running
-      ![ragllm pods](https://validatedpatterns.io/images/rag-llm-gitops/rag-llm.png)
-
-    - Click on Networking → Routes from the left Navigation panel. An llm-ui route should exist
-      ![llm-ui route](https://validatedpatterns.io/images/rag-llm-gitops/ragllm-application_route.png)
-
-    - Click on the link under Location column and it should launch the application
-      ![llm-ui application](https://validatedpatterns.io/images/rag-llm-gitops/ragllm-model-application.png)
-
-    - Enter customer name as ‘IBM’ and for product enter ‘RedHat OpenShift’ and click Generate. A project proposal should be generated
-      ![llm-ui project](https://validatedpatterns.io/images/rag-llm-gitops/ragllm-application-running.png)
-
-    - Click on Ratings to rate the model.
-
-- Verify Grafana and Prometheus are installed correctly.
-  - By default, Grafana application is deployed in llm-monitoring namespace.To launch the Grafana Dashboard, follow the instructions below:
-    - Grab the credentials of Grafana Application
-      - Navigate to Workloads --> Secrets
-      - Click on the grafana-admin-credentials and copy the `GF_SECURITY_ADMIN_USER`, `GF_SECURITY_ADMIN_PASSWORD`
-    - Launch Grafana Dashboard
-      - Navigate to Networking --> Routes in the llm-monitoring namespace.
-      - Click on the Location link for grafana-route.
-      - Enter the Grafana admin credentials.
-      - Ratings are displayed for each model
-    - Grafana Dashboard is displayed
-
-      ![llm-ui grafana](https://validatedpatterns.io/images/rag-llm-gitops/ragllm-grafana.png)
+- Query Verification Test Cases:
+  - Verify Edge Route creation:
+    - Query: *"How do I expose my web application service frontend-svc on port 8080 with edge TLS termination?"*
+    - Verify RAG returns OpenShift `Route` resource (`spec.tls.termination: edge`) or `oc create route edge`.
+  - Verify Security Context Constraints:
+    - Query: *"How do I allow a pod running under service account deploy-sa to access host path mounts or run privileged?"*
+    - Verify RAG returns `oc adm policy add-scc-to-user privileged -z deploy-sa`.
+  - Verify ImageStreams:
+    - Query: *"How do I track and deploy container image updates automatically in a namespace?"*
+    - Verify RAG returns OpenShift `ImageStream` guidance and `oc import-image`.

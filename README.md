@@ -1,287 +1,154 @@
-# Document Generation Demo with LLM and RAG
+# OpenShift 4.22 Documentation Assistant with LLM and RAG
 
 ## Introduction
 
-This deployment uses the [**Validated Patterns**](https://validatedpatterns.io/) framework,
-taking advantage of GitOps for seamless provisioning of all operators and applications.
-It deploys a Chatbot application that harnesses the power of Large Language Models (LLMs) combined
-with the Retrieval-Augmented Generation (RAG) framework.
+This repository provides a GitOps deployment using the [**Validated Patterns**](https://validatedpatterns.io/) framework for an **OpenShift 4.22 Documentation Assistant**. It deploys a Large Language Model (LLM) augmented with Retrieval-Augmented Generation (RAG) using documentation from OpenShift Container Platform (OCP) 4.22.
 
-The pattern uses [**Red Hat OpenShift AI**](https://www.redhat.com/en/technologies/cloud-computing/openshift/openshift-ai) to deploy and serve LLM models at scale.
+The application includes an interface to compare responses generated directly by the base model with responses augmented by retrieved documentation.
 
-By default, this pattern uses [**pgvector**](https://github.com/pgvector/pgvector) as the RAG DB backend.
-[**EDB Postgres**](https://www.enterprisedb.com/docs/edb-postgres-ai/latest/ai-factory/vector-engine/),
-[**Redis**](https://redis.io/docs/latest/develop/get-started/vector-database/),
-[**Elasticsearch**](https://www.elastic.co/elasticsearch/vector-database), and
-[**Microsoft SQL Server**](https://learn.microsoft.com/en-us/sql/sql-server/ai/vectors?view=sql-server-ver17)
-(either a local deployment as part of the pattern or an existing SQL Server DB on Azure) are also options
-for RAG DB backends.
+### Components
 
-This pattern populates your chosen RAG DB with documents relating to Red Hat OpenShift AI for the purpose
-of generating project proposals.
+- **Documentation Ingestion**: Ingests documentation from the `enterprise-4.22` branch of [`openshift/openshift-docs`](https://github.com/openshift/openshift-docs).
+- **Model Stack**:
+  - **LLM**: `google/gemma-3-4b-it` served via vLLM in 16-bit precision (`--dtype=half`).
+  - **Embeddings**: `Qwen/Qwen3-Embedding-0.6B`.
+  - **Vector Database**: `PGVECTOR` (PostgreSQL with `pgvector` extension).
+- **Comparison Interface**: Allows testing queries side-by-side to observe base model output versus retrieval-augmented output.
+- **GitOps Management**: Provisioned and reconciled through OpenShift GitOps (Argo CD) and Helm.
 
-## Pre-requisites
-
-- Podman
-- Red Hat Openshift cluster running in AWS. Supported regions are : us-east-1 us-east-2 us-west-1 us-west-2 ca-central-1 sa-east-1 eu-west-1 eu-west-2 eu-west-3 eu-central-1 eu-north-1 ap-northeast-1 ap-northeast-2 ap-northeast-3 ap-southeast-1 ap-southeast-2 ap-south-1.
-- Create a fork of the [rag-llm-gitops](https://github.com/validatedpatterns/rag-llm-gitops.git) Git repository.
-- **EDB Postgres Operator Credentials** (Required only if you select EDB): The EDB Postgres for Kubernetes operator from the certified-operators catalog requires authentication to pull images from `docker.enterprisedb.com`. You will need to:
-  1. Register for a free trial account at [EDB Registration](https://www.enterprisedb.com/accounts/register)
-  2. Obtain your subscription token from [EDB Repos Downloads](https://www.enterprisedb.com/repos-downloads)
-  3. Add the token to your `values-secret.yaml` file during configuration (see below)
-
-  For more details, see the [EDB Installation Documentation](https://www.enterprisedb.com/docs/postgres_for_kubernetes/latest/installation_upgrade/).
-
-## Demo Description & Architecture
-
-The goal of this demo is to demonstrate a Chatbot LLM application augmented with data from Red Hat product documentation
-running on [Red Hat OpenShift AI](https://www.redhat.com/en/technologies/cloud-computing/openshift/openshift-ai). It deploys an LLM application that connects to multiple LLM providers such as OpenAI, Hugging Face, and NVIDIA NIM.
-The application generates a project proposal for a Red Hat product.
-
-### Key Features
-
-- Leveraging [Red Hat OpenShift AI](https://www.redhat.com/en/technologies/cloud-computing/openshift/openshift-ai) to deploy and serve LLM models powered by NVIDIA GPU accelerator.
-- LLM Application augmented with content from Red Hat product documentation.
-- Multiple LLM providers (OpenAI, Hugging Face, NVIDIA).
-- Vector Database, such as EDB Postgres for Kubernetes or Redis, to store embeddings of Red Hat product documentation.
-- Monitoring dashboard to provide key metrics such as ratings.
-- GitOps setup to deploy end-to-end demo (frontend / vector database / served models).
-
-![Overview](https://gitlab.com/osspa/portfolio-architecture-examples/-/raw/main/images/intro-marketectures/rag-demo-vp-marketing-slide.png)
-
-_Figure 1. Overview of the validated pattern for RAG Demo with Red Hat OpenShift_
-
-![Logical](https://gitlab.com/osspa/portfolio-architecture-examples/-/raw/main/images/logical-diagrams/rag-demo-vp-ld.png)
-
-_Figure 2. Logical diagram of the RAG Demo with Red Hat OpenShift._
-
-#### RAG Demo Workflow
-
-![Overview of workflow](https://gitlab.com/osspa/portfolio-architecture-examples/-/raw/main/images/schematic-diagrams/rag-demo-vp-sd.png)
-
-_Figure 3. Schematic diagram for workflow of RAG demo with Red Hat OpenShift._
-
-#### RAG Data Ingestion
-
-![ingestion](https://gitlab.com/osspa/portfolio-architecture-examples/-/raw/main/images/schematic-diagrams/rag-demo-vp-ingress-sd.png)
-
-_Figure 4. Schematic diagram for Ingestion of data for RAG._
-
-#### RAG Augmented Query
-
-![query](https://gitlab.com/osspa/portfolio-architecture-examples/-/raw/main/images/schematic-diagrams/rag-demo-vp-query-sd.png)
-
-_Figure 5. Schematic diagram for RAG demo augmented query._
-
-In Figure 5, we can see RAG augmented query. [IBM Granite 3.1-8B-Instruct](https://huggingface.co/ibm-granite/granite-3.1-8b-instruct) model is used for language processing, LangChain to
-integrate different tools of the LLM-based application together and to process the PDF
-files and web pages, vector database provider such as EDB Postgres for Kubernetes or Redis, is used to store vectors, and [Red Hat OpenShift AI](https://www.redhat.com/en/technologies/cloud-computing/openshift/openshift-ai) to serve the [IBM Granite 3.1-8B-Instruct](https://huggingface.co/ibm-granite/granite-3.1-8b-instruct) model, Gradio is used for user interface and object storage to store language model and other datasets.
-Solution components are deployed as microservices in the Red Hat OpenShift cluster.
-
-#### Download diagrams
-
-View and download all of the diagrams above in our open source tooling site.
-
-[Open Diagrams](https://www.redhat.com/architect/portfolio/tool/index.html?#gitlab.com/osspa/portfolio-architecture-examples/-/raw/main/diagrams/rag-demo-vp.drawio)
-
-![Diagram](images/diagram.png)
-_Figure 6. Proposed demo architecture with OpenShift AI_
-
-### Components deployed
-
-- **vLLM Text Generation Inference Server:** The pattern deploys a vLLM Inference Server. The server deploys and serves `ibm-granite/granite-3.1-8b-instruct` model. The server will require a GPU node.
-- **EDB Postgres for Kubernetes / Redis Server:** A Vector Database server is deployed to store vector embeddings created from Red Hat product documentation.
-- **Populate VectorDb Job:** The job creates the embeddings and populates the vector database.
-- **LLM Application:** This is a Chatbot application that can generate a project proposal by augmenting the LLM with the Red Hat product documentation stored in vector db.
-- **Prometheus:** Deploys a prometheus instance to store the various metrics from the LLM application and TGIS server.
-- **Grafana:** Deploys Grafana application to visualize the metrics.
-
-## Deploying the demo
-
-To run the demo, ensure the Podman is running on your machine.Fork the [rag-llm-gitops](https://github.com/validatedpatterns/rag-llm-gitops) repository into your organization
-
-### Login to OpenShift cluster
-
-Replace the token and the API server URL in the command below to login to the OpenShift cluster.
-
-```sh
-oc login --token=<token> --server=<api_server_url> # login to Openshift cluster
-```
-
-### Cloning repository
-
-```sh
-git clone https://github.com/<<your-username>>/rag-llm-gitops.git
-cd rag-llm-gitops
-```
-
-### Configuring model
-
-This pattern deploys [IBM Granite 3.3-8B-Instruct](https://huggingface.co/ibm-granite/granite-3.3-8b-instruct) out of box. Run the following command to configure vault with the model ID.
-
-```sh
-# Copy values-secret.yaml.template to ~/values-secret-rag-llm-gitops.yaml.
-# You should never check-in these files
-# Add secrets to the values-secret.yaml that needs to be added to the vault.
-cp values-secret.yaml.template ~/values-secret-rag-llm-gitops.yaml
-```
-
-To deploy a model that requires a Hugging Face token, grab the [Hugging Face token](https://huggingface.co/settings/tokens) and accept the terms and conditions on the model page. Update the `hftoken` secret in
-`~/values-secret-rag-llm-gitops.yaml` and edit the value of `.global.model.vllm` in
-[`values-global.yaml`](./values-global.yaml) to your desired model.
-
-**IMPORTANT**: If you are using EDB Postgres for Kubernetes, you must add your EDB subscription token to
-`~/values-secret-rag-llm-gitops.yaml`:
-
-```sh
-secrets:
-  - name: hfmodel
-    fields:
-    - name: hftoken
-      value: null
-  - name: edb
-    fields:
-    - name: token
-      value: "YOUR_EDB_TOKEN_HERE"  # Replace with your EDB subscription token
-      description: EDB subscription token for pulling certified operator images
-```
-
-The EDB token is synced into Vault and then used by External Secrets to create the required pull secret (`postgresql-operator-pull-secret`) in `openshift-operators`. Without this token, the EDB operator will fail to pull its container image and the database will not be created.
-
-If you are using PGVector or SQL Server, you can update the password in this file. Otherwise, an autogenerated
-password is used.
-
-### Provision GPU MachineSet
-
-As a pre-requisite to deploy the application using this Validated Pattern, a GPU node needs to be provisioned.
-To provision the GPU node on AWS:
-
-```sh
-./pattern.sh make create-gpu-machineset
-```
-
-Wait till the node is provisioned and running.
-
-![Diagram](images/nodes.png)
-
-Alternatiely, follow the [instructions](./GPU_provisioning.md) to manually install the GPU node.
-
-### Deploy application
-
-***Note:**: This pattern supports five types of vector databases: pgvector, EDB Postgres for Kubernetes, Elasticsearch, Redis, and SQL Server. By default the pattern will deploy pgvector as the RAG DB. To deploy EDB, set `global.db.type` to `EDB` in [values-global.yaml](./values-global.yaml).
-
-```yaml
 ---
-global:
-  pattern: rag-llm-gitops
-  options:
-    useCSV: false
-    syncPolicy: Automatic
-    installPlanApproval: Automatic
-  # Possible values for RAG vector DB db.type:
-  #   REDIS    -> Redis (Local chart deploy)
-  #   EDB      -> PGVector via EDB operator (Local chart deploy)
-  #   PGVECTOR -> PGVector (Local Postgres chart deploy)
-  #   ELASTIC  -> Elasticsearch (Local chart deploy)
-  #   MSSQL    -> MS SQL Server (Local chart deploy)
-  #   AZURESQL -> Azure SQL (Pre-existing in Azure)
-  db:
-    index: docs
-    type: PGVECTOR
-  # Models used by the inference service (should be a HuggingFace model ID)
-  model:
-    vllm: ibm-granite/granite-3.3-8b-instruct
-    embedding: sentence-transformers/all-mpnet-base-v2
 
-  storageClass: gp3-csi
+## Architecture & Resource Usage
 
-main:
-  clusterGroupName: hub
-  multiSourceConfig:
-    enabled: true
-    clusterGroupChartVersion: 0.9.*
+```
++-----------------------------------------------------------------------------------------+
+|                                    OpenShift Cluster                                    |
+|                                                                                         |
+|  +--------------------+        +---------------------+        +----------------------+  |
+|  | OpenShift GitOps   | -----> | vLLM Serving        | -----> | NVIDIA GPU Node      |  |
+|  | (Argo CD & Helm)   |        | google/gemma-3-4b-it|        | (16GB VRAM, e.g. T4) |  |
+|  +--------------------+        | 16-bit, 64k context |        | Usage: ~11.3 GB      |  |
+|            |                   +---------------------+        +----------------------+  |
+|            v                              ^                              ^              |
+|            |                              |                              |              |
+|  +--------------------+        +---------------------+                   |              |
+|  | Documentation UI   | -----> | RAG Assistant Engine|                   |              |
+|  | - Chat Interface   |        | (LangChain / Gradio)|                   |              |
+|  | - Comparison Tab   |        +---------------------+                   |              |
+|  +--------------------+                   |                              |              |
+|                                           v                              |              |
+|                                +---------------------+                   |              |
+|                                | PGVector Database   |                   |              |
+|                                | (PostgreSQL 16)     |                   |              |
+|                                +---------------------+                   |              |
+|                                           ^                              |              |
+|                                           | Ingestion                    |              |
+|                                +---------------------+                   |              |
+|                                | populate-vectordb   |                   |              |
+|                                | - Qwen3-Embedding   | ------------------+              |
+|                                | - OCP 4.22 Git Docs |                                  |
+|                                +---------------------+                                  |
++-----------------------------------------------------------------------------------------+
 ```
 
-Following commands will take about 15-20 minutes
+### GPU Memory Allocation (16-Bit Precision, 64k Context)
 
-> **Validated pattern will be deployed**
+Gemma-3-4B uses a hybrid sliding window attention mechanism (local layers at 1,024 tokens, global full-attention layers):
+- **Model Weights (FP16)**: ~8.6 GB
+- **CUDA Overhead & Activations**: ~1.2 GB
+- **KV Cache (64k context)**: ~1.46 GB
+- **Estimated GPU Memory**: **~11.3 GB**, running on a 16 GB GPU instance (such as AWS `g4dn.xlarge` / NVIDIA T4).
 
+---
+
+## Repository Structure
+
+1. **`charts/all/vllm-inference-service`**: Deploys `google/gemma-3-4b-it` using vLLM on a GPU-enabled node.
+2. **`charts/all/rag-llm`**:
+   - **`pgvector`**: PostgreSQL deployment with the `pgvector` extension.
+   - **`populate-vectordb` Job**: Clones `openshift/openshift-docs` (`enterprise-4.22`), chunks markdown/adoc sources (chunk size: 2048, overlap: 200), computes embeddings, and stores them in PostgreSQL.
+   - **`llm-ui`**: Gradio-based web interface with chat and comparison modes.
+
+---
+
+## Deployment & Configuration
+
+### 1. Prerequisites
+- Red Hat OpenShift Container Platform cluster.
+- At least one GPU node provisioned with NVIDIA GPU Operator and Node Feature Discovery.
+- A Hugging Face account with access to [google/gemma-3-4b-it](https://huggingface.co/google/gemma-3-4b-it) and a [Hugging Face User Access Token](https://huggingface.co/settings/tokens).
+- A fork of this repository (`rag-llm-gitops`).
+
+### 2. Configure Secrets
+On your bastion or management host:
+
+1. Copy the secret template:
+   ```sh
+   cp values-secret.yaml.template ~/values-secret-rag-llm-gitops.yaml
+   ```
+2. Populate the Hugging Face token and PostgreSQL credentials:
+   ```yaml
+   secrets:
+     - name: hfmodel
+       vaultPrefixes:
+       - hub
+       fields:
+       - name: hftoken
+         value: "hf_xxxxxxxxxxxxxxxxxxxxxx" # Hugging Face Read Token
+     - name: pgvector
+       vaultPrefixes:
+       - hub
+       fields:
+       - name: username
+         value: "postgres"
+       - name: password
+         value: "postgres"
+       - name: databasename
+         value: "vectordb"
+   ```
+3. Load the secrets into Vault:
+   ```sh
+   ./pattern.sh make load-secrets
+   ```
+
+### 3. Deploy the Pattern
+Install the pattern:
 ```sh
 ./pattern.sh make install
 ```
+Argo CD will synchronize the components, deploy PGVector, execute the documentation population job, initialize the vLLM service, and start the UI.
 
-### 1: Verify the installation
+---
 
-- Login to the OpenShift web console.
-- Navigate to the Workloads --> Pods.
-- Select the `rag-llm` project from the drop down.
-- Following pods should be up and running.
+## Example Queries and Comparison
 
-![Pods](images/rag-llm.png)
+The following queries can be tested in the UI to compare responses from the base model against the RAG-augmented model:
 
-Note: If the hf-text-generation-server is not running, make sure you have followed the steps to configure a node with GPU from the [instructions](./GPU_provisioning.md) provided above.
+| Query / Topic | Base Model (Without RAG) | RAG Assistant (With OpenShift 4.22 Docs) |
+| :--- | :--- | :--- |
+| **Edge Route Configuration**<br>*"How do I expose my web application service frontend-svc on port 8080 with edge TLS termination?"* | Typically generates standard Kubernetes `Ingress` manifests with ingress controller annotations. | Provides the native OpenShift `Route` resource (`kind: Route`, `spec.tls.termination: edge`) or the corresponding `oc create route edge` command. |
+| **Security Context Constraints**<br>*"How do I allow a pod running under service account deploy-sa to access host path mounts or run privileged?"* | Typically suggests Kubernetes `PodSecurityPolicy` or container securityContext fields without cluster-level SCC authorization. | References OpenShift Security Context Constraints (SCC) and the `oc adm policy add-scc-to-user privileged -z deploy-sa` command. |
+| **Container Images**<br>*"How do I track and deploy container image updates automatically in a namespace?"* | References external image polling tools or fixed image tags in Deployments. | References OpenShift `ImageStream` resources, `oc import-image`, and image triggers. |
+| **Storage**<br>*"What is the default storage class and how do I mount an existing PVC in my deployment?"* | References generic storage classes (`standard`, `hostpath`). | References OpenShift 4.22 CSI storage classes (`gp3-csi`, `odf`) and volume mounting syntax. |
 
-### 2: Launch the application
+---
 
-- Click the `Application box` icon in the header, and select `Retrieval-Augmented-Generation (RAG) LLM Demonstration UI`
+## Verifying Deployment
 
-![Launch Application](images/launch-application.png)
+1. **Verify Pods in `rag-llm` Namespace**:
+   ```sh
+   oc get pods -n rag-llm
+   ```
+   Expected pods:
+   - `pgvector-postgresql-...` (PostgreSQL vector database)
+   - `populate-vectordb-...` (Completed documentation embedding job)
+   - `llm-ui-...` (Gradio assistant frontend)
 
-- It should launch the application
+2. **Verify Pods in `vllm` Namespace**:
+   ```sh
+   oc get pods -n vllm
+   ```
+   - `hf-text-generation-server-...` (Running `google/gemma-3-4b-it` on GPU)
 
-  ![Application](images/application.png)
-
-### 3: Generate the proposal document
-
-- It will use the default provider and model configured as part of the application deployment. The default provider is a Hugging Face model server running in the OpenShift. The model server is deployed with this valdiated pattern and requires a node with GPU.
-- Enter any company name
-- Enter the product as `RedHat OpenShift`
-- Click the `Generate` button, a project proposal should be generated. The project proposal also contains the reference of the RAG content. The project proposal document can be Downloaded in the form of a PDF document.
-
-  ![Routes](images/proposal.png)
-
-### 4: Add an OpenAI provider
-
-You can optionally add additional providers. The application supports the following providers
-
-- Hugging Face Text Generation Inference Server
-- OpenAI
-- NVIDIA
-
-Click on the `Add Provider` tab to add a new provider. Fill in the details and click `Add Provider` button. The provider should be added in the `Providers` dropdown uder `Chatbot` tab.
-
-![Routes](images/add_provider.png)
-
-### 5: Generate the proposal document using OpenAI provider
-
-Follow the instructions in step 3 to generate the proposal document using the OpenAI provider.
-
-![Routes](images/chatgpt.png)
-
-### 6: Rating the provider
-
-You can provide rating to the model by clicking on the `Rate the model` radio button. The rating will be captured as part of the metrics and can help the company which model to deploy in prodcution.
-
-### 7: Grafana Dashboard
-
-By default, Grafana application is deployed in `llm-monitoring` namespace.To launch the Grafana Dashboard, follow the instructions below:
-
-- Grab the credentials of Grafana Application
-  - Navigate to Workloads --> Secrets
-  - Click on the grafana-admin-credentials and copy the GF_SECURITY_ADMIN_USER, GF_SECURITY_ADMIN_PASSWORD
-- Launch Grafana Dashboard
-  - Click the `Application box` icon in the header, and select `Grafana UI for LLM ratings`
- ![Launch Application](images/launch-application.png)
-  - Enter the Grafana admin credentials.
-  - Ratings are displayed for each model.
-
-![Routes](images/monitoring.png)
-
-## Test Plan
-
-GOTO: [Test Plan](./TESTPLAN.md)
-
-## Licenses
-
-EDB Postgres for Kubernetes is distributed under the EDB Limited Usage License
-Agreement, available at [enterprisedb.com/limited-use-license](https://www.enterprisedb.com/limited-use-license).
+3. **Access Application**:
+   Navigate to OpenShift Web Console -> **Networking** -> **Routes** in the `rag-llm` namespace to access the application URL.

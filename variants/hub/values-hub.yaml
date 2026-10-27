@@ -67,11 +67,6 @@ clusterGroup:
       name: rag-llm
       namespace: rag-llm
       path: charts/all/rag-llm
-    llm-monitoring:
-      name: llm-monitoring
-      namespace: llm-monitoring
-      kustomize: true
-      path: charts/all/llm-monitoring/kustomize/overlays/dev
     nfd-config:
       name: nfd-config
       namespace: openshift-cfd
@@ -84,10 +79,6 @@ clusterGroup:
       name: rag-llm-ui-config
       namespace: rag-llm
       path: charts/all/rag-llm-ui-config
-    llm-monitoring-config:
-      name: grafana-ui-config
-      namespace: llm-monitoring
-      path: charts/all/llm-monitoring-config
     openshift-ai:
       name: openshift-ai
       namespace: redhat-ods-operator
