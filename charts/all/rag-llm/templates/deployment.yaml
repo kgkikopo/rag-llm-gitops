@@ -85,7 +85,7 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           {{- if .Values.ui.build.enabled }}
-          image: "rag-llm-ui:latest"
+          image: {{ printf "image-registry.openshift-image-registry.svc:5000/%s/%s:%s" .Release.Namespace (.Values.ui.imageStream.name | default "rag-llm-ui") (.Values.ui.imageStream.tag | default "latest") }}
           imagePullPolicy: Always
           {{- else }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
