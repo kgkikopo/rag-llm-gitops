@@ -24,6 +24,23 @@ podLabels: {}
 podSecurityContext: {}
 securityContext: {}
 
+lifecycle:
+  postStart:
+    exec:
+      command:
+        - /bin/sh
+        - -c
+        - |
+          for i in $(seq 1 30); do
+            if pg_isready -U "$POSTGRES_USER"; then
+              psql -U "$POSTGRES_USER" -c "ALTER USER \"$POSTGRES_USER\" WITH PASSWORD '$POSTGRES_PASSWORD';"
+              psql -U "$POSTGRES_USER" -c "CREATE DATABASE \"$POSTGRES_DBNAME\";" || true
+              psql -U "$POSTGRES_USER" -d "$POSTGRES_DBNAME" -c "CREATE EXTENSION IF NOT EXISTS vector;" || true
+              break
+            fi
+            sleep 1
+          done
+
 service:
   type: ClusterIP
   port: 5432
