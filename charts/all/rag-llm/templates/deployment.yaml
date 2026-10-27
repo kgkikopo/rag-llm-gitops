@@ -84,8 +84,16 @@ spec:
               value: {{ .Values.global.db.index }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          {{- if .Values.ui.build.enabled }}
-          image: {{ printf "image-registry.openshift-image-registry.svc:5000/%s/%s:%s" .Release.Namespace (.Values.ui.imageStream.name | default "rag-llm-ui") (.Values.ui.imageStream.tag | default "latest") }}
+          {{- if and .Values.ui .Values.ui.build .Values.ui.build.enabled }}
+          {{- $isName := "rag-llm-ui" }}
+          {{- $isTag := "latest" }}
+          {{- if and .Values.ui.imageStream .Values.ui.imageStream.name }}
+            {{- $isName = .Values.ui.imageStream.name }}
+          {{- end }}
+          {{- if and .Values.ui.imageStream .Values.ui.imageStream.tag }}
+            {{- $isTag = .Values.ui.imageStream.tag }}
+          {{- end }}
+          image: {{ printf "image-registry.openshift-image-registry.svc:5000/%s/%s:%s" .Release.Namespace $isName $isTag }}
           imagePullPolicy: Always
           {{- else }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"

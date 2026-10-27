@@ -24,6 +24,11 @@ image:
 ui:
   build:
     enabled: true
+  imageStream:
+    name: rag-llm-ui
+    tag: latest
+  buildConfig:
+    name: rag-llm-ui
 
 imagePullSecrets: []
 nameOverride: ""
