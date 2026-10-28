@@ -216,8 +216,16 @@ def get_active_model_name() -> str:
         return MODEL_NAME.split("/")[-1]
     return MODEL_NAME
 
+DEFAULT_SYSTEM_PROMPT = (
+    "You are an OpenShift Container Platform 4.22 documentation assistant. "
+    "Your purpose is to provide accurate, production-ready technical assistance based on official OpenShift 4.22 specifications. "
+    "Provide exact CLI commands (`oc ...`) and complete, valid YAML manifests where applicable. "
+    "When documentation tool results are provided, ground your answer strictly in that context. "
+    "For general greetings and casual remarks, respond politely and concisely without searching documentation."
+)
+
 def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
-    """Calls vLLM OpenAI-compatible chat completions endpoint."""
+    """Calls vLLM OpenAI-compatible chat completions endpoint (synchronous)."""
     target_url = find_working_vllm_url()
     url = f"{target_url.rstrip('/')}/chat/completions"
     active_model = get_active_model_name()
@@ -234,7 +242,6 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
         data = resp.json()
         return data["choices"][0]["message"]["content"]
     except requests.exceptions.ConnectionError:
-        # Fallback to internal DNS if external route failed
         fallback = "http://vllm-inference-service-predictor:8080/v1/chat/completions"
         if url != fallback:
             try:
@@ -244,7 +251,7 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
                 return data["choices"][0]["message"]["content"]
             except Exception:
                 pass
-        return f"[Connection Error] Unable to connect to inference service at {url}. The vLLM model pod may still be starting or downloading model weights."
+        return f"[Connection Error] Unable to connect to inference service at {url}."
     except Exception as e:
         alt_model = MODEL_NAME if active_model != MODEL_NAME else active_model.split("/")[-1]
         if alt_model != active_model:
@@ -258,62 +265,187 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
                 pass
         return f"[Error] LLM request failed: {e}"
 
+def call_llm_stream(messages: list[dict], max_tokens: int = MAX_TOKENS):
+    """Streams completions from vLLM using Server-Sent Events (SSE)."""
+    target_url = find_working_vllm_url()
+    url = f"{target_url.rstrip('/')}/chat/completions"
+    active_model = get_active_model_name()
+    payload = {
+        "model": active_model,
+        "messages": messages,
+        "temperature": TEMPERATURE,
+        "top_p": TOP_P,
+        "max_tokens": max_tokens,
+        "stream": True
+    }
+    try:
+        resp = requests.post(url, json=payload, stream=True, timeout=180, verify=False)
+        resp.raise_for_status()
+        for line in resp.iter_lines():
+            if line:
+                decoded = line.decode("utf-8").strip()
+                if decoded.startswith("data: "):
+                    data_str = decoded[6:]
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data_str)
+                        choices = chunk.get("choices", [])
+                        if choices:
+                            delta = choices[0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                yield content
+                    except Exception:
+                        continue
+    except requests.exceptions.ConnectionError:
+        fallback = "http://vllm-inference-service-predictor:8080/v1/chat/completions"
+        if url != fallback:
+            try:
+                resp = requests.post(fallback, json=payload, stream=True, timeout=180)
+                resp.raise_for_status()
+                for line in resp.iter_lines():
+                    if line:
+                        decoded = line.decode("utf-8").strip()
+                        if decoded.startswith("data: "):
+                            data_str = decoded[6:]
+                            if data_str == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(data_str)
+                                choices = chunk.get("choices", [])
+                                if choices:
+                                    delta = choices[0].get("delta", {})
+                                    content = delta.get("content", "")
+                                    if content:
+                                        yield content
+                            except Exception:
+                                continue
+                return
+            except Exception:
+                pass
+        yield f"\n\n[Connection Error] Unable to connect to inference service at {url}."
+    except Exception as e:
+        yield f"\n\n[Error] LLM streaming failed: {e}"
+
+def is_casual_greeting(msg: str) -> bool:
+    """Detects simple conversational pleasantries that do not require tool retrieval."""
+    clean = msg.strip().lower().rstrip("!.,?")
+    greetings = {
+        "hi", "hello", "hey", "good morning", "good afternoon", "good evening",
+        "howdy", "sup", "thanks", "thank you", "thx", "bye", "goodbye", "who are you"
+    }
+    return clean in greetings
+
 # --- Chat Assistant Logic ---
 def chat_respond(user_message: str, chat_history: list):
     history = list(chat_history) if chat_history else []
     if not user_message or not user_message.strip():
-        return "", history
+        yield "", history
+        return
+
+    # 1. Immediately append user turn and placeholder assistant turn
+    history.append({"role": "user", "content": user_message})
+    history.append({"role": "assistant", "content": "..."})
+    yield "", history
+
+    # Build conversation context with static system prompt
+    messages = [{"role": "system", "content": DEFAULT_SYSTEM_PROMPT}]
+    # Add previous dialogue history (up to last 6 turns)
+    for item in history[:-2][-6:]:
+        if isinstance(item, dict):
+            role = item.get("role", "user")
+            content = item.get("content", "")
+            if role == "assistant" and "</details>" in content:
+                # Strip tool card HTML from prior turns so LLM context remains clean text
+                content = content.split("</details>", 1)[-1].strip()
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+
+    # 2. Check if query is a greeting
+    if is_casual_greeting(user_message):
+        messages.append({"role": "user", "content": user_message})
+        accumulated = ""
+        for chunk in call_llm_stream(messages, max_tokens=256):
+            accumulated += chunk
+            history[-1] = {"role": "assistant", "content": accumulated}
+            yield "", history
+        return
+
+    # 3. Technical question: execute tool call to search OpenShift 4.22 documentation
+    tool_banner = (
+        f'<details open style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
+        f'<summary style="cursor: pointer; font-weight: 600; color: #0284c7;">⚙️ <b>Tool Call</b>: <code>search_openshift_docs(query="{user_message}")</code></summary>\n'
+        f'<div style="margin-top: 6px; font-size: 13px; color: #64748b;">Searching PGVector for matching OpenShift 4.22 documentation chunks...</div>\n'
+        f'</details>'
+    )
+    history[-1] = {"role": "assistant", "content": tool_banner}
+    yield "", history
 
     docs, error_msg = retrieve_docs(user_message, top_k=4)
 
     if docs:
+        snippets_html = []
         context_blocks = []
         sources = set()
         for idx, doc in enumerate(docs, 1):
-            context_blocks.append(f"--- Document Snippet [{idx}] (Source: {doc['source']}) ---\n{doc['content']}")
-            sources.add(doc['source'])
+            src = doc.get("source", "Unknown")
+            sources.add(src)
+            content_snippet = doc.get("content", "")
+            preview = content_snippet[:220].replace("<", "&lt;").replace(">", "&gt;") + "..."
+            dist = doc.get("distance", 0.0)
+            score = max(0.0, 1.0 - dist)
+
+            snippets_html.append(
+                f'<div style="margin-top: 6px; padding: 6px 10px; background: #ffffff; border-radius: 4px; border-left: 3px solid #0284c7;">'
+                f'<div style="font-weight: 600; font-size: 12px; color: #0f172a;">[{idx}] {src} <span style="font-weight: normal; color: #64748b;">(Score: {score:.2f})</span></div>'
+                f'<div style="font-size: 12px; color: #475569; margin-top: 2px;">{preview}</div>'
+                f'</div>'
+            )
+            context_blocks.append(f"--- Document Snippet [{idx}] (Source: {src}) ---\n{content_snippet}")
+
+        tool_card = (
+            f'<details style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
+            f'<summary style="cursor: pointer; font-weight: 600; color: #0284c7;">🔧 <b>Tool Result</b>: <code>search_openshift_docs</code> &mdash; {len(docs)} OpenShift 4.22 documentation snippets retrieved</summary>\n'
+            f'<div style="margin-top: 8px;">\n'
+            f"{''.join(snippets_html)}\n"
+            f'</div>\n'
+            f'</details>'
+        )
+
         context_str = "\n\n".join(context_blocks)
-        
-        system_prompt = (
-            "You are an OpenShift Container Platform 4.22 documentation assistant. "
-            "Use the provided official OpenShift 4.22 documentation snippets to answer the user's question accurately. "
-            "Provide exact CLI commands (`oc ...`) and complete YAML manifests where applicable. "
-            "If the provided documentation does not contain enough information, state that clearly.\n\n"
-            f"Official Documentation Context:\n{context_str}"
+        augmented_prompt = (
+            f"[Official OpenShift 4.22 Documentation Tool Output]:\n{context_str}\n\n"
+            f"User Question: {user_message}"
         )
-    else:
-        system_prompt = (
-            "You are an OpenShift Container Platform 4.22 documentation assistant. "
-            "Answer the question accurately based on OpenShift 4.22 specifications."
-        )
+        messages.append({"role": "user", "content": augmented_prompt})
 
-    messages = [{"role": "system", "content": system_prompt}]
-    for item in history[-6:]:
-        if isinstance(item, dict):
-            role = item.get("role", "user")
-            content = item.get("content", "")
-            if role in ("user", "assistant") and content:
-                messages.append({"role": role, "content": content})
-        elif isinstance(item, (list, tuple)) and len(item) == 2:
-            messages.append({"role": "user", "content": str(item[0])})
-            messages.append({"role": "assistant", "content": str(item[1])})
+        # 4. Stream response from vLLM
+        full_response = tool_card + "\n\n"
+        for chunk in call_llm_stream(messages):
+            full_response += chunk
+            history[-1] = {"role": "assistant", "content": full_response}
+            yield "", history
 
-    messages.append({"role": "user", "content": user_message})
-
-    answer = call_llm(messages)
-
-    if docs:
+        # Append source references at end
         sources_list = "\n".join([f"- `{s}`" for s in sorted(sources)])
-        formatted_answer = f"{answer}\n\n---\n**Referenced Documentation Sources:**\n{sources_list}"
-    else:
-        if error_msg:
-            formatted_answer = f"{answer}\n\n*(Note: Documentation retrieval unavailable: {error_msg})*"
-        else:
-            formatted_answer = answer
+        final_answer = f"{full_response}\n\n---\n**Referenced Documentation Sources:**\n{sources_list}"
+        history[-1] = {"role": "assistant", "content": final_answer}
+        yield "", history
 
-    history.append({"role": "user", "content": user_message})
-    history.append({"role": "assistant", "content": formatted_answer})
-    return "", history
+    else:
+        # Fallback if no documents found or error occurred
+        tool_card = (
+            f'<details style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
+            f'<summary style="cursor: pointer; font-weight: 600; color: #c2410c;">⚠️ <b>Tool Result</b>: <code>search_openshift_docs</code> &mdash; No documents found ({error_msg or "Empty collection"})</summary>\n'
+            f'</details>'
+        )
+        messages.append({"role": "user", "content": user_message})
+        full_response = tool_card + "\n\n"
+        for chunk in call_llm_stream(messages):
+            full_response += chunk
+            history[-1] = {"role": "assistant", "content": full_response}
+            yield "", history
 
 # --- Comparison Logic ---
 def compare_query(query: str):
