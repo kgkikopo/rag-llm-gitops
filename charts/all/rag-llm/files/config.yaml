@@ -8,7 +8,7 @@ llm_providers:
         url: "http://vllm-inference-service-predictor:8080/v1"
         params:
           - name: max_new_tokens
-            value: 4096
+            value: 2048
           - name: temperature
             value: 1.0
           - name: top_k

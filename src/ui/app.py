@@ -49,7 +49,7 @@ MODEL_NAME = os.environ.get("MODEL_NAME", "google/gemma-3-4b-it")
 TEMPERATURE = float(os.environ.get("TEMPERATURE", "1.0"))
 TOP_P = float(os.environ.get("TOP_P", "0.95"))
 TOP_K = int(os.environ.get("TOP_K", "64"))
-MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "4096"))
+MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "2048"))
 
 if os.path.exists(CONFIG_FILE):
     try:
@@ -229,7 +229,7 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
         "max_tokens": max_tokens
     }
     try:
-        resp = requests.post(url, json=payload, timeout=120, verify=False)
+        resp = requests.post(url, json=payload, timeout=180, verify=False)
         resp.raise_for_status()
         data = resp.json()
         return data["choices"][0]["message"]["content"]
@@ -238,7 +238,7 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
         fallback = "http://vllm-inference-service-predictor:8080/v1/chat/completions"
         if url != fallback:
             try:
-                resp = requests.post(fallback, json=payload, timeout=120)
+                resp = requests.post(fallback, json=payload, timeout=180)
                 resp.raise_for_status()
                 data = resp.json()
                 return data["choices"][0]["message"]["content"]

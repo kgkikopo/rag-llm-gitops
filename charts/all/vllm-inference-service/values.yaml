@@ -41,7 +41,7 @@ vllmServingRuntime:
     - "--model=/cache/models"
     - "--distributed-executor-backend=mp"
     - "--max-model-len=65536"
-    - "--dtype=half"
+    - "--dtype=bfloat16"
     - "--gpu-memory-utilization"
     - "0.90"
     - "--enforce-eager"
