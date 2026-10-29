@@ -176,8 +176,11 @@ populateDbJob:
   args:
     - |
       set -e
-      echo "[Init] Configuring AsciiDoc text loader and git branch support..."
-      cat << 'PYEOF' > /app/loaders/text.py
+      echo "[Init] Copying embedder app to writable /tmp/app..."
+      cp -r /app /tmp/app
+
+      echo "[Init] Configuring AsciiDoc text loader and git branch support in /tmp/app..."
+      cat << 'PYEOF' > /tmp/app/loaders/text.py
       import logging
       from pathlib import Path
       from typing import List
@@ -238,7 +241,7 @@ populateDbJob:
               return grouped
       PYEOF
 
-      cat << 'PYEOF' > /app/loaders/git.py
+      cat << 'PYEOF' > /tmp/app/loaders/git.py
       import logging, shutil, subprocess
       from pathlib import Path
       from typing import List
@@ -311,8 +314,9 @@ populateDbJob:
               return matched
       PYEOF
 
-      echo "[Init] Starting embedding pipeline..."
-      python3 /app/embed_documents.py
+      echo "[Init] Starting embedding pipeline from /tmp/app..."
+      cd /tmp/app
+      python3 ./embed_documents.py
 
   # Environment overrides
   tempDir: /docs
