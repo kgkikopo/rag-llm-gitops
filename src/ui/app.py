@@ -49,7 +49,7 @@ MODEL_NAME = os.environ.get("MODEL_NAME", "google/gemma-3-4b-it")
 TEMPERATURE = float(os.environ.get("TEMPERATURE", "1.0"))
 TOP_P = float(os.environ.get("TOP_P", "0.95"))
 TOP_K = int(os.environ.get("TOP_K", "64"))
-MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "2048"))
+MAX_TOKENS = int(os.environ.get("MAX_TOKENS", "12000"))
 
 if os.path.exists(CONFIG_FILE):
     try:
@@ -72,7 +72,7 @@ if os.path.exists(CONFIG_FILE):
                                     elif p.get("name") == "top_k":
                                         TOP_K = int(p.get("value", 64))
                                     elif p.get("name") == "max_new_tokens":
-                                        MAX_TOKENS = int(p.get("value", 4096))
+                                        MAX_TOKENS = int(p.get("value", 12000))
                                 break
             if cfg and "default_model" in cfg and cfg["default_model"]:
                 default_m = cfg["default_model"]
@@ -267,7 +267,7 @@ DEFAULT_SYSTEM_PROMPT = (
     "3. When documentation is retrieved, ground your answer strictly in that context. Provide exact CLI commands (`oc ...`) and valid YAML manifests where applicable."
 )
 
-# --- Tool Definitions ---
+# --- Tool Definitions (OpenAI Standard Schema) ---
 TOOLS = [
     {
         "type": "function",
@@ -288,85 +288,33 @@ TOOLS = [
     }
 ]
 
-def evaluate_tool_decision(messages: list[dict], user_message: str) -> tuple[bool, str, str | None]:
-    """
-    Evaluates whether the LLM chooses to invoke search_openshift_docs or answer directly.
-    Returns:
-        (should_search: bool, search_query: str, direct_content: str | None)
-    """
+def call_llm_with_tools(messages: list[dict]) -> tuple[list | None, str | None]:
+    """Calls vLLM with OpenAI tools. Returns (tool_calls, content) as structured JSON objects."""
     target_url = find_working_vllm_url()
     url = f"{target_url.rstrip('/')}/chat/completions"
     active_model = get_active_model_name()
-
-    # 1. First attempt: standard OpenAI tools protocol
     payload = {
         "model": active_model,
         "messages": messages,
         "tools": TOOLS,
         "tool_choice": "auto",
-        "temperature": 0.0,
-        "max_tokens": 512
+        "temperature": TEMPERATURE,
+        "top_p": TOP_P
     }
-
-    try:
-        resp = requests.post(url, json=payload, timeout=60, verify=False)
-        if resp.status_code == 200:
-            data = resp.json()
-            choice = data.get("choices", [{}])[0]
-            msg = choice.get("message", {})
-            tool_calls = msg.get("tool_calls")
-
-            if tool_calls and len(tool_calls) > 0:
-                for tc in tool_calls:
-                    fn = tc.get("function", {})
-                    if fn.get("name") == "search_openshift_docs":
-                        args_raw = fn.get("arguments", "{}")
-                        query = user_message
-                        if isinstance(args_raw, dict):
-                            query = args_raw.get("query", user_message)
-                        elif isinstance(args_raw, str):
-                            try:
-                                args_dict = json.loads(args_raw)
-                                query = args_dict.get("query", user_message)
-                            except Exception:
-                                query = args_raw.strip('"\' ') or user_message
-                        return True, query, None
-
-            # Model chose not to call tools, responded directly
-            content = msg.get("content", "")
-            return False, "", content
-        else:
-            logger.info(f"vLLM endpoint returned status {resp.status_code} for tool_choice='auto'. Using fallback LLM routing.")
-    except Exception as e:
-        logger.warning(f"Tool decision request error ({e}). Using fallback LLM routing.")
-
-    # 2. Resilient fallback: Query the LLM to decide routing
-    classifier_messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are an OpenShift documentation routing classifier.\n"
-                "Given the user's message, determine if it requires searching official OpenShift 4.22 documentation.\n"
-                "- If the query asks about OpenShift, Kubernetes, cluster operations, `oc` commands, operators, networking, storage, or security: respond with 'SEARCH: <search query>'.\n"
-                "- If the query is a greeting, casual chat, general knowledge (math, trivia), or off-topic: respond with 'DIRECT'."
-            )
-        },
-        {"role": "user", "content": user_message}
-    ]
-    try:
-        decision = call_llm(classifier_messages, max_tokens=64).strip()
-        if decision.startswith("SEARCH:") or "SEARCH" in decision.upper():
-            if "SEARCH:" in decision:
-                extracted = decision.split("SEARCH:", 1)[1].strip()
-            else:
-                extracted = decision.replace("SEARCH", "").strip(": \n")
-            search_query = extracted if extracted else user_message
-            return True, search_query, None
-        else:
-            return False, "", None
-    except Exception as e:
-        logger.warning(f"Routing fallback error ({e}), proceeding directly.")
-        return False, "", None
+    if MAX_TOKENS is not None:
+        payload["max_tokens"] = MAX_TOKENS
+    logger.info("========== [LLM TOOL CALL REQUEST] ==========\n%s\n=============================================", format_messages_for_log(messages))
+    resp = requests.post(url, json=payload, timeout=180, verify=False)
+    resp.raise_for_status()
+    data = resp.json()
+    msg = data["choices"][0]["message"]
+    tool_calls = msg.get("tool_calls")
+    content = msg.get("content")
+    if tool_calls:
+        logger.info("========== [LLM TOOL CALL RESPONSE] ==========\n%s\n==============================================", json.dumps(tool_calls, indent=2))
+    else:
+        logger.info("========== [LLM DIRECT RESPONSE] ==========\n%s\n===========================================", content)
+    return tool_calls, content
 
 def format_messages_for_log(messages: list[dict]) -> str:
     lines = []
@@ -376,7 +324,7 @@ def format_messages_for_log(messages: list[dict]) -> str:
         lines.append(f"--- [{role}] ---\n{content}")
     return "\n".join(lines)
 
-def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
+def call_llm(messages: list[dict], max_tokens: int | None = None) -> str:
     """Calls vLLM OpenAI-compatible chat completions endpoint (synchronous)."""
     target_url = find_working_vllm_url()
     url = f"{target_url.rstrip('/')}/chat/completions"
@@ -385,9 +333,11 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
         "model": active_model,
         "messages": messages,
         "temperature": TEMPERATURE,
-        "top_p": TOP_P,
-        "max_tokens": max_tokens
+        "top_p": TOP_P
     }
+    limit = max_tokens if max_tokens is not None else MAX_TOKENS
+    if limit is not None:
+        payload["max_tokens"] = limit
     logger.info("========== [LLM INPUT PROMPT (SYNC)] ==========\n%s\n===============================================", format_messages_for_log(messages))
     try:
         resp = requests.post(url, json=payload, timeout=180, verify=False)
@@ -424,7 +374,7 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
                 pass
         return f"[Error] LLM request failed: {e}"
 
-def call_llm_stream(messages: list[dict], max_tokens: int = MAX_TOKENS):
+def call_llm_stream(messages: list[dict], max_tokens: int | None = None):
     """Streams completions from vLLM using Server-Sent Events (SSE)."""
     target_url = find_working_vllm_url()
     url = f"{target_url.rstrip('/')}/chat/completions"
@@ -434,9 +384,11 @@ def call_llm_stream(messages: list[dict], max_tokens: int = MAX_TOKENS):
         "messages": messages,
         "temperature": TEMPERATURE,
         "top_p": TOP_P,
-        "max_tokens": max_tokens,
         "stream": True
     }
+    limit = max_tokens if max_tokens is not None else MAX_TOKENS
+    if limit is not None:
+        payload["max_tokens"] = limit
     logger.info("========== [LLM INPUT PROMPT (STREAM)] ==========\n%s\n=================================================", format_messages_for_log(messages))
     accumulated_output = []
     try:
@@ -528,34 +480,37 @@ def chat_respond(user_message: str, chat_history: list):
 
     messages.append({"role": "user", "content": user_message})
 
-    # 2. Modern Tool Calling: LLM decides whether to invoke search_openshift_docs
-    should_search, search_query, direct_content = evaluate_tool_decision(messages, user_message)
+    # 2. Call LLM with native OpenAI tools (No regex)
+    tool_calls, direct_content = call_llm_with_tools(messages)
 
-    if not should_search:
-        # LLM chose direct response (greeting, general knowledge, or conversational)
-        if direct_content:
-            accumulated = ""
-            words = direct_content.split(" ")
-            for i, word in enumerate(words):
-                accumulated += (word + " " if i < len(words) - 1 else word)
-                history[-1] = {"role": "assistant", "content": accumulated}
-                if i % 3 == 0:
-                    yield "", history
-            history[-1] = {"role": "assistant", "content": direct_content}
-            yield "", history
-        else:
-            accumulated = ""
-            for chunk in call_llm_stream(messages):
-                accumulated += chunk
-                history[-1] = {"role": "assistant", "content": accumulated}
+    if not tool_calls:
+        # LLM responded directly (greeting, casual conversation, or general knowledge)
+        accumulated = ""
+        words = (direct_content or "").split(" ")
+        for i, word in enumerate(words):
+            accumulated += (word + " " if i < len(words) - 1 else word)
+            history[-1] = {"role": "assistant", "content": accumulated}
+            if i % 3 == 0:
                 yield "", history
+        history[-1] = {"role": "assistant", "content": direct_content or ""}
+        yield "", history
         return
 
-    # 3. LLM chose to search OpenShift 4.22 documentation
+    # 3. LLM called search_openshift_docs tool
+    tc = tool_calls[0]
+    raw_args = tc.get("function", {}).get("arguments", "{}")
+    if isinstance(raw_args, dict):
+        target_query = raw_args.get("query", user_message)
+    else:
+        try:
+            target_query = json.loads(raw_args).get("query", user_message)
+        except Exception:
+            target_query = user_message
+
     tool_initial = (
         f'<details style="margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
         f'<summary style="cursor: pointer; font-size: 12px; font-weight: 500; color: #94a3b8; list-style: none; display: inline-flex; align-items: center; gap: 5px; user-select: none;">'
-        f'<span style="font-size: 10px;">&#x25BE;</span> Searching OpenShift 4.22 documentation for "{search_query}"...'
+        f'<span style="font-size: 10px;">&#x25BE;</span> Searching OpenShift 4.22 documentation for "{target_query}"...'
         f'</summary>\n'
         f'</details>\n'
         f'<div style="border-top: 1px solid #f1f5f9; width: 100%; margin-bottom: 12px;"></div>'
@@ -563,7 +518,7 @@ def chat_respond(user_message: str, chat_history: list):
     history[-1] = {"role": "assistant", "content": tool_initial}
     yield "", history
 
-    docs, error_msg = retrieve_docs(search_query, top_k=4)
+    docs, error_msg = retrieve_docs(target_query, top_k=4)
 
     if docs:
         snippets_html = []
@@ -614,7 +569,7 @@ def chat_respond(user_message: str, chat_history: list):
 
         context_str = "\n\n".join(context_blocks)
         augmented_prompt = (
-            f"[Official OpenShift 4.22 Documentation Tool Output for '{search_query}']:\n{context_str}\n\n"
+            f"[Official OpenShift 4.22 Documentation Tool Output for '{target_query}']:\n{context_str}\n\n"
             f"User Question: {user_message}"
         )
         # Replace the last user message with augmented prompt
