@@ -385,10 +385,10 @@ populateDbJob:
 
   resources:
     limits:
-      cpu: '4'
+      cpu: '8'
       memory: 16Gi
     requests:
-      cpu: '2'
+      cpu: '4'
       memory: 4Gi
 
   securityContext:
