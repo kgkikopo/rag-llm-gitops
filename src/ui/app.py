@@ -368,6 +368,14 @@ def evaluate_tool_decision(messages: list[dict], user_message: str) -> tuple[boo
         logger.warning(f"Routing fallback error ({e}), proceeding directly.")
         return False, "", None
 
+def format_messages_for_log(messages: list[dict]) -> str:
+    lines = []
+    for m in messages:
+        role = m.get("role", "unknown").upper()
+        content = m.get("content", "")
+        lines.append(f"--- [{role}] ---\n{content}")
+    return "\n".join(lines)
+
 def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
     """Calls vLLM OpenAI-compatible chat completions endpoint (synchronous)."""
     target_url = find_working_vllm_url()
@@ -380,11 +388,14 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
         "top_p": TOP_P,
         "max_tokens": max_tokens
     }
+    logger.info("========== [LLM INPUT PROMPT (SYNC)] ==========\n%s\n===============================================", format_messages_for_log(messages))
     try:
         resp = requests.post(url, json=payload, timeout=180, verify=False)
         resp.raise_for_status()
         data = resp.json()
-        return data["choices"][0]["message"]["content"]
+        result = data["choices"][0]["message"]["content"]
+        logger.info("========== [LLM OUTPUT RESPONSE (SYNC)] ==========\n%s\n=================================================", result)
+        return result
     except requests.exceptions.ConnectionError:
         fallback = "http://vllm-inference-service-predictor:8080/v1/chat/completions"
         if url != fallback:
@@ -392,7 +403,9 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
                 resp = requests.post(fallback, json=payload, timeout=180)
                 resp.raise_for_status()
                 data = resp.json()
-                return data["choices"][0]["message"]["content"]
+                result = data["choices"][0]["message"]["content"]
+                logger.info("========== [LLM OUTPUT RESPONSE (SYNC)] ==========\n%s\n=================================================", result)
+                return result
             except Exception:
                 pass
         return f"[Connection Error] Unable to connect to inference service at {url}."
@@ -404,7 +417,9 @@ def call_llm(messages: list[dict], max_tokens: int = MAX_TOKENS) -> str:
                 resp = requests.post(url, json=payload, timeout=120, verify=False)
                 resp.raise_for_status()
                 data = resp.json()
-                return data["choices"][0]["message"]["content"]
+                result = data["choices"][0]["message"]["content"]
+                logger.info("========== [LLM OUTPUT RESPONSE (SYNC)] ==========\n%s\n=================================================", result)
+                return result
             except Exception:
                 pass
         return f"[Error] LLM request failed: {e}"
@@ -422,6 +437,8 @@ def call_llm_stream(messages: list[dict], max_tokens: int = MAX_TOKENS):
         "max_tokens": max_tokens,
         "stream": True
     }
+    logger.info("========== [LLM INPUT PROMPT (STREAM)] ==========\n%s\n=================================================", format_messages_for_log(messages))
+    accumulated_output = []
     try:
         resp = requests.post(url, json=payload, stream=True, timeout=180, verify=False)
         resp.raise_for_status()
@@ -439,9 +456,12 @@ def call_llm_stream(messages: list[dict], max_tokens: int = MAX_TOKENS):
                             delta = choices[0].get("delta", {})
                             content = delta.get("content", "")
                             if content:
+                                accumulated_output.append(content)
                                 yield content
                     except Exception:
                         continue
+        if accumulated_output:
+            logger.info("========== [LLM OUTPUT RESPONSE (STREAM)] ==========\n%s\n===================================================", "".join(accumulated_output))
     except requests.exceptions.ConnectionError:
         fallback = "http://vllm-inference-service-predictor:8080/v1/chat/completions"
         if url != fallback:
@@ -462,9 +482,12 @@ def call_llm_stream(messages: list[dict], max_tokens: int = MAX_TOKENS):
                                     delta = choices[0].get("delta", {})
                                     content = delta.get("content", "")
                                     if content:
+                                        accumulated_output.append(content)
                                         yield content
                             except Exception:
                                 continue
+                if accumulated_output:
+                    logger.info("========== [LLM OUTPUT RESPONSE (STREAM)] ==========\n%s\n===================================================", "".join(accumulated_output))
                 return
             except Exception:
                 pass

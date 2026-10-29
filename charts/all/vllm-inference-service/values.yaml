@@ -45,6 +45,9 @@ vllmServingRuntime:
     - "--gpu-memory-utilization"
     - "0.90"
     - "--enforce-eager"
+    - "--enable-log-requests"
+    - "--enable-log-outputs"
+    - "--max-log-len=65536"
 
   command:
     - python
