@@ -106,6 +106,38 @@ def get_db_connection():
     register_vector(conn)
     return conn
 
+# --- Documentation URL & Title Resolvers ---
+def get_live_doc_url(source_path: str) -> str:
+    """Resolves an AsciiDoc repository path to the live official OpenShift 4.22 documentation URL."""
+    clean = source_path
+    if "@" in clean:
+        clean = clean.split("@", 1)[1]
+    clean = clean.lstrip("/")
+    for ext in [".adoc", ".md", ".txt"]:
+        if clean.endswith(ext):
+            clean = clean[:-len(ext)]
+            break
+    return f"https://docs.openshift.com/container-platform/4.22/{clean}.html"
+
+def get_doc_title(source_path: str, content: str = "") -> str:
+    """Extracts a human-readable document title from content headings or filepath."""
+    if content:
+        for line in content.splitlines()[:8]:
+            line = line.strip()
+            if line.startswith("= ") and len(line) > 2:
+                return line[2:].strip()
+            if line.startswith("# ") and len(line) > 2:
+                return line[2:].strip()
+            if line.startswith("## ") and len(line) > 3 and not line.endswith(".adoc"):
+                return line[3:].strip()
+    raw = source_path.split("@")[-1]
+    fname = os.path.basename(raw)
+    for ext in [".adoc", ".md", ".txt"]:
+        if fname.endswith(ext):
+            fname = fname[:-len(ext)]
+            break
+    return fname.replace("-", " ").replace("_", " ").title()
+
 # --- Retrieval Function ---
 def retrieve_docs(query: str, top_k: int = 4):
     """Embeds query and queries PGVector for top matching documentation snippets."""
@@ -118,43 +150,53 @@ def retrieve_docs(query: str, top_k: int = 4):
 
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Check for langchain-postgres v2 direct table (e.g. "docs")
+                # 1. Check for langchain-postgres v2 direct table (e.g. "docs")
                 cur.execute("""
                     SELECT EXISTS (
                         SELECT FROM information_schema.tables 
                         WHERE table_name = %s
                     );
                 """, (COLLECTION_NAME,))
-                if cur.fetchone()[0]:
-                    sql = f"""
-                        SELECT content, langchain_metadata, (embedding <=> %s::vector) AS distance
-                        FROM "{COLLECTION_NAME}"
-                        ORDER BY distance ASC
-                        LIMIT %s;
-                    """
-                    cur.execute(sql, (query_embedding, top_k))
-                    rows = cur.fetchall()
-                else:
-                    # Check legacy langchain_pg_collection schema
+                table_exists = cur.fetchone()[0]
+                rows = []
+
+                if table_exists:
+                    cur.execute(f'SELECT count(*) FROM "{COLLECTION_NAME}";')
+                    doc_count = cur.fetchone()[0]
+                    if doc_count > 0:
+                        sql = f"""
+                            SELECT content, langchain_metadata, (embedding <=> %s::vector) AS distance
+                            FROM "{COLLECTION_NAME}"
+                            ORDER BY distance ASC
+                            LIMIT %s;
+                        """
+                        cur.execute(sql, (query_embedding, top_k))
+                        rows = cur.fetchall()
+
+                # 2. Check legacy langchain_pg_collection schema if no rows found yet
+                if not rows:
                     cur.execute("""
                         SELECT EXISTS (
                             SELECT FROM information_schema.tables 
                             WHERE table_name = 'langchain_pg_collection'
                         );
                     """)
-                    if not cur.fetchone()[0]:
-                        return [], f"Database table '{COLLECTION_NAME}' not yet created. The documentation ingestion job may still be running."
+                    if cur.fetchone()[0]:
+                        sql = """
+                            SELECT e.document, e.cmetadata, (e.embedding <=> %s::vector) AS distance
+                            FROM langchain_pg_embedding e
+                            JOIN langchain_pg_collection c ON e.collection_id = c.uuid
+                            WHERE c.name = %s
+                            ORDER BY distance ASC
+                            LIMIT %s;
+                        """
+                        cur.execute(sql, (query_embedding, COLLECTION_NAME, top_k))
+                        rows = cur.fetchall()
 
-                    sql = """
-                        SELECT e.document, e.cmetadata, (e.embedding <=> %s::vector) AS distance
-                        FROM langchain_pg_embedding e
-                        JOIN langchain_pg_collection c ON e.collection_id = c.uuid
-                        WHERE c.name = %s
-                        ORDER BY distance ASC
-                        LIMIT %s;
-                    """
-                    cur.execute(sql, (query_embedding, COLLECTION_NAME, top_k))
-                    rows = cur.fetchall()
+                if not rows:
+                    if not table_exists:
+                        return [], f"Database table '{COLLECTION_NAME}' not yet created. The documentation ingestion job may still be starting."
+                    return [], f"Vector database is connected, but collection '{COLLECTION_NAME}' contains 0 indexed chunks."
 
                 docs = []
                 for doc_text, metadata, dist in rows:
@@ -373,13 +415,15 @@ def chat_respond(user_message: str, chat_history: list):
         return
 
     # 3. Technical question: execute tool call to search OpenShift 4.22 documentation
-    tool_banner = (
-        f'<details open style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
-        f'<summary style="cursor: pointer; font-weight: 600; color: #0284c7;">⚙️ <b>Tool Call</b>: <code>search_openshift_docs(query="{user_message}")</code></summary>\n'
-        f'<div style="margin-top: 6px; font-size: 13px; color: #64748b;">Searching PGVector for matching OpenShift 4.22 documentation chunks...</div>\n'
-        f'</details>'
+    tool_initial = (
+        f'<details style="margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
+        f'<summary style="cursor: pointer; font-size: 12px; font-weight: 500; color: #94a3b8; list-style: none; display: inline-flex; align-items: center; gap: 5px; user-select: none;">'
+        f'<span style="font-size: 10px;">&#x25BE;</span> Searching OpenShift 4.22 documentation...'
+        f'</summary>\n'
+        f'</details>\n'
+        f'<div style="border-top: 1px solid #f1f5f9; width: 100%; margin-bottom: 12px;"></div>'
     )
-    history[-1] = {"role": "assistant", "content": tool_banner}
+    history[-1] = {"role": "assistant", "content": tool_initial}
     yield "", history
 
     docs, error_msg = retrieve_docs(user_message, top_k=4)
@@ -387,30 +431,48 @@ def chat_respond(user_message: str, chat_history: list):
     if docs:
         snippets_html = []
         context_blocks = []
-        sources = set()
+        sources_map = {}
+
         for idx, doc in enumerate(docs, 1):
             src = doc.get("source", "Unknown")
-            sources.add(src)
-            content_snippet = doc.get("content", "")
-            preview = content_snippet[:220].replace("<", "&lt;").replace(">", "&gt;") + "..."
+            content = doc.get("content", "")
             dist = doc.get("distance", 0.0)
             score = max(0.0, 1.0 - dist)
+            title = get_doc_title(src, content)
+            url = get_live_doc_url(src)
+            sources_map[title] = url
+
+            escaped_content = (
+                content.replace("&", "&amp;")
+                       .replace("<", "&lt;")
+                       .replace(">", "&gt;")
+            )
+            clean_src_path = src.split("@")[-1]
+            border_style = 'border-top: 1px solid #e2e8f0; padding-top: 12px;' if idx > 1 else ''
 
             snippets_html.append(
-                f'<div style="margin-top: 6px; padding: 6px 10px; background: #ffffff; border-radius: 4px; border-left: 3px solid #0284c7;">'
-                f'<div style="font-weight: 600; font-size: 12px; color: #0f172a;">[{idx}] {src} <span style="font-weight: normal; color: #64748b;">(Score: {score:.2f})</span></div>'
-                f'<div style="font-size: 12px; color: #475569; margin-top: 2px;">{preview}</div>'
+                f'<div style="margin-top: 12px; {border_style}">'
+                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">'
+                f'<a href="{url}" target="_blank" rel="noopener noreferrer" style="font-weight: 600; color: #0284c7; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">'
+                f'{title} <span style="font-size: 10px; opacity: 0.7;">&#x2197;</span></a>'
+                f'<span style="font-size: 11px; font-family: monospace; color: #64748b; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">{score*100:.0f}% relevance</span>'
+                f'</div>'
+                f'<div style="font-size: 10px; font-family: monospace; color: #94a3b8; margin-bottom: 6px;">{clean_src_path}</div>'
+                f'<pre style="font-size: 11px; font-family: monospace; color: #334155; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; white-space: pre-wrap; word-break: break-word; line-height: 1.5; margin: 0;">{escaped_content}</pre>'
                 f'</div>'
             )
-            context_blocks.append(f"--- Document Snippet [{idx}] (Source: {src}) ---\n{content_snippet}")
+            context_blocks.append(f"--- Document [{title}] ({clean_src_path}) ---\n{content}")
 
         tool_card = (
-            f'<details style="background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
-            f'<summary style="cursor: pointer; font-weight: 600; color: #0284c7;">🔧 <b>Tool Result</b>: <code>search_openshift_docs</code> &mdash; {len(docs)} OpenShift 4.22 documentation snippets retrieved</summary>\n'
-            f'<div style="margin-top: 8px;">\n'
+            f'<details style="margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
+            f'<summary style="cursor: pointer; font-size: 12px; font-weight: 500; color: #64748b; list-style: none; display: inline-flex; align-items: center; gap: 5px; user-select: none;">'
+            f'<span style="font-size: 10px;">&#x25BE;</span> Searched {len(docs)} OpenShift 4.22 documentation sources'
+            f'</summary>\n'
+            f'<div style="margin-top: 8px; margin-left: 12px; padding-left: 12px; border-left: 2px solid #e2e8f0;">\n'
             f"{''.join(snippets_html)}\n"
             f'</div>\n'
-            f'</details>'
+            f'</details>\n'
+            f'<div style="border-top: 1px solid #f1f5f9; width: 100%; margin-bottom: 12px;"></div>'
         )
 
         context_str = "\n\n".join(context_blocks)
@@ -427,18 +489,33 @@ def chat_respond(user_message: str, chat_history: list):
             history[-1] = {"role": "assistant", "content": full_response}
             yield "", history
 
-        # Append source references at end
-        sources_list = "\n".join([f"- `{s}`" for s in sorted(sources)])
-        final_answer = f"{full_response}\n\n---\n**Referenced Documentation Sources:**\n{sources_list}"
+        # Append source references with live links at the end
+        sources_links = [
+            f'• <a href="{url}" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: underline;">{title}</a>'
+            for title, url in sorted(sources_map.items())
+        ]
+        sources_section = "<br>".join(sources_links)
+        final_answer = f"{full_response}\n\n---\n**Official OpenShift 4.22 Documentation Sources:**\n\n{sources_section}"
         history[-1] = {"role": "assistant", "content": final_answer}
         yield "", history
 
     else:
         # Fallback if no documents found or error occurred
+        no_docs_explanation = (
+            error_msg or
+            f"The documentation search returned 0 matching chunks from collection '{COLLECTION_NAME}'. "
+            f"This occurs if the ingestion job is still indexing or no chunks met the retrieval threshold."
+        )
         tool_card = (
-            f'<details style="background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; padding: 8px 12px; margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
-            f'<summary style="cursor: pointer; font-weight: 600; color: #c2410c;">⚠️ <b>Tool Result</b>: <code>search_openshift_docs</code> &mdash; No documents found ({error_msg or "Empty collection"})</summary>\n'
-            f'</details>'
+            f'<details style="margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
+            f'<summary style="cursor: pointer; font-size: 12px; font-weight: 500; color: #64748b; list-style: none; display: inline-flex; align-items: center; gap: 5px; user-select: none;">'
+            f'<span style="font-size: 10px;">&#x25BE;</span> No documentation matches found'
+            f'</summary>\n'
+            f'<div style="margin-top: 8px; margin-left: 12px; padding-left: 12px; border-left: 2px solid #e2e8f0; font-size: 11px; color: #64748b; line-height: 1.5;">\n'
+            f'{no_docs_explanation}\n'
+            f'</div>\n'
+            f'</details>\n'
+            f'<div style="border-top: 1px solid #f1f5f9; width: 100%; margin-bottom: 12px;"></div>'
         )
         messages.append({"role": "user", "content": user_message})
         full_response = tool_card + "\n\n"
@@ -446,6 +523,13 @@ def chat_respond(user_message: str, chat_history: list):
             full_response += chunk
             history[-1] = {"role": "assistant", "content": full_response}
             yield "", history
+
+        fallback_footer = (
+            f"\n\n---\n*(Note: Generated from base model knowledge &mdash; official documentation references currently unavailable)*"
+        )
+        final_answer = f"{full_response}{fallback_footer}"
+        history[-1] = {"role": "assistant", "content": final_answer}
+        yield "", history
 
 # --- Comparison Logic ---
 def compare_query(query: str):
@@ -463,10 +547,16 @@ def compare_query(query: str):
     docs, error_msg = retrieve_docs(query, top_k=4)
     if docs:
         context_blocks = []
-        sources = set()
+        sources_map = {}
         for idx, doc in enumerate(docs, 1):
-            context_blocks.append(f"[{idx}] {doc['content']}")
-            sources.add(doc['source'])
+            src = doc.get("source", "Unknown")
+            cnt = doc.get("content", "")
+            title = get_doc_title(src, cnt)
+            url = get_live_doc_url(src)
+            sources_map[title] = url
+            clean_path = src.split("@")[-1]
+            context_blocks.append(f"[{idx}] {title} ({clean_path}):\n{cnt}")
+
         context_str = "\n\n".join(context_blocks)
         rag_messages = [
             {
@@ -481,8 +571,11 @@ def compare_query(query: str):
             {"role": "user", "content": query}
         ]
         rag_body = call_llm(rag_messages)
-        sources_list = "\n".join([f"- `{s}`" for s in sorted(sources)])
-        rag_output = f"{rag_body}\n\n---\n**Retrieved Sources (OpenShift 4.22 Docs):**\n{sources_list}"
+        sources_links = [
+            f'• <a href="{url}" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: underline;">{title}</a>'
+            for title, url in sorted(sources_map.items())
+        ]
+        rag_output = f"{rag_body}\n\n---\n**Official OpenShift 4.22 Documentation Sources:**\n\n" + "<br>".join(sources_links)
     else:
         rag_output = f"Retrieval returned no documents. ({error_msg or 'Empty collection'})\n\nDirect answer:\n" + call_llm([
             {"role": "system", "content": "You are an OpenShift 4.22 documentation assistant."},
@@ -534,6 +627,8 @@ def check_status():
 custom_css = """
 footer {visibility: hidden}
 .output-box { min-height: 350px; font-family: monospace; font-size: 14px; }
+details summary::-webkit-details-marker { display: none; }
+details summary { list-style: none; }
 """
 
 with gr.Blocks(title=APP_TITLE, css=custom_css) as demo:

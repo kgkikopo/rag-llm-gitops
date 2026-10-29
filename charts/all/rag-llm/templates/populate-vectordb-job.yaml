@@ -143,10 +143,12 @@ spec:
         - name: PGVECTOR_COLLECTION_NAME
           value: {{ .Values.global.db.index }}
         {{- if .Values.populateDbJob.command }}
-        command: {{ .Values.populateDbJob.command }}
+        command:
+          {{- toYaml .Values.populateDbJob.command | nindent 10 }}
         {{- end }}
         {{- if .Values.populateDbJob.args }}
-        args: {{ .Values.populateDbJob.args }}
+        args:
+          {{- toYaml .Values.populateDbJob.args | nindent 10 }}
         {{- end }}
         {{- with .Values.populateDbJob.resources }}
         resources:

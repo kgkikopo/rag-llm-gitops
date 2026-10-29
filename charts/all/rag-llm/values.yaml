@@ -170,6 +170,150 @@ populateDbJob:
   backoffLimit: 10
   restartPolicy: Never
 
+  command:
+    - /bin/sh
+    - -c
+  args:
+    - |
+      set -e
+      echo "[Init] Configuring AsciiDoc text loader and git branch support..."
+      cat << 'PYEOF' > /app/loaders/text.py
+      import logging
+      from pathlib import Path
+      from typing import List
+      from langchain.text_splitter import RecursiveCharacterTextSplitter
+      from langchain_core.documents import Document
+      from config import Config
+
+      logger = logging.getLogger(__name__)
+
+      class TextLoader:
+          def __init__(self, config: Config):
+              self.config = config
+              self.splitter = RecursiveCharacterTextSplitter(
+                  chunk_size=config.chunk_size,
+                  chunk_overlap=config.chunk_overlap,
+              )
+
+          def _process_single_file(self, path: Path) -> List[Document]:
+              try:
+                  content = path.read_text(encoding="utf-8", errors="ignore")
+              except Exception as e:
+                  logger.warning("Failed to read %s: %s", path, e)
+                  return []
+
+              if not content.strip():
+                  return []
+
+              raw_chunks = self.splitter.split_text(content)
+              fname = path.name
+              source_str = str(path)
+              chunks = []
+              for idx, text in enumerate(raw_chunks):
+                  heading = f"## {fname}\n"
+                  chunks.append(Document(
+                      page_content=heading + text,
+                      metadata={"source": source_str, "chunk_id": idx}
+                  ))
+              return chunks
+
+          def _add_chunk_totals(self, docs: List[Document]) -> None:
+              counts = {}
+              for doc in docs:
+                  s = doc.metadata["source"]
+                  counts[s] = counts.get(s, 0) + 1
+              for doc in docs:
+                  doc.metadata["chunk_total"] = counts[doc.metadata["source"]]
+
+          def load(self, paths: List[Path]) -> List[Document]:
+              grouped = []
+              for path in paths:
+                  try:
+                      chunks = self._process_single_file(path)
+                      grouped.extend(chunks)
+                  except Exception as e:
+                      logger.warning("Failed to load %s: %s", path, e)
+              self._add_chunk_totals(grouped)
+              logger.info("Successfully produced %d chunks from %d files", len(grouped), len(paths))
+              return grouped
+      PYEOF
+
+      cat << 'PYEOF' > /app/loaders/git.py
+      import logging, shutil, subprocess
+      from pathlib import Path
+      from typing import List
+      from langchain_core.documents import Document
+      from config import Config
+      from loaders.pdf import PDFLoader
+      from loaders.text import TextLoader
+
+      logger = logging.getLogger(__name__)
+
+      class GitLoader:
+          def __init__(self, config: Config):
+              self.config = config
+              self.base_path = Path(config.temp_dir) / "repo_sources"
+              self.pdf_loader = PDFLoader(config)
+              self.text_loader = TextLoader(config)
+
+          def load(self) -> List[Document]:
+              all_chunks: List[Document] = []
+              for repo_entry in self.config.repo_sources:
+                  repo_url = repo_entry["repo"]
+                  globs = repo_entry.get("globs", [])
+                  branch = repo_entry.get("branch")
+                  repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
+                  repo_path = self.base_path / repo_name
+                  self._ensure_repo_up_to_date(repo_url, repo_path, branch)
+                  matched_files = self._collect_files(repo_path, globs)
+                  matched_files = [f for f in matched_files if f.is_file()]
+                  pdf_files = [f for f in matched_files if f.suffix.lower() == ".pdf"]
+                  text_files = [f for f in matched_files if f.suffix.lower() != ".pdf"]
+                  docs: List[Document] = []
+                  if pdf_files:
+                      docs.extend(self.pdf_loader.load(pdf_files))
+                  if text_files:
+                      docs.extend(self.text_loader.load(text_files))
+                  for doc in docs:
+                      local_src = Path(doc.metadata.get("source", ""))
+                      try:
+                          rel_path = local_src.relative_to(repo_path)
+                      except ValueError:
+                          rel_path = local_src
+                      doc.metadata.update({"source": f"{repo_url}@{rel_path.as_posix()}"})
+                  all_chunks.extend(docs)
+              return all_chunks
+
+          def _ensure_repo_up_to_date(self, url: str, dest: Path, branch: str = None) -> None:
+              if dest.exists():
+                  try:
+                      subprocess.run(["git", "-C", str(dest), "pull"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                      if branch:
+                          subprocess.run(["git", "-C", str(dest), "checkout", branch], check=False)
+                      return
+                  except subprocess.CalledProcessError:
+                      shutil.rmtree(dest)
+              self._clone_repo(url, dest, branch)
+
+          def _clone_repo(self, url: str, dest: Path, branch: str = None) -> None:
+              logger.info("Cloning repo %s (branch: %s) to %s", url, branch, dest)
+              cmd = ["git", "clone", "--depth", "1"]
+              if branch:
+                  cmd.extend(["--branch", branch])
+              cmd.extend([url, str(dest)])
+              subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+          def _collect_files(self, base: Path, patterns: List[str]) -> List[Path]:
+              matched: List[Path] = []
+              for pattern in patterns:
+                  found = list(base.glob(pattern))
+                  matched.extend(found)
+              return matched
+      PYEOF
+
+      echo "[Init] Starting embedding pipeline..."
+      python3 /app/embed_documents.py
+
   # Environment overrides
   tempDir: /docs
   logLevel: info
@@ -190,26 +334,13 @@ populateDbJob:
     overlap: 200
   embeddingModel: Qwen/Qwen3-Embedding-0.6B
 
-
-  # By default, fullname uses '{{ .Release.Name }}-{{ .Chart.Name }}'. This
-  # overrides that and uses the given string instead.
-  # fullnameOverride: "some-name"
-
-  # This adds a prefix
-  # fullnamePrefix: "pre-"
-  # This appends a suffix
-  # fullnameSuffix: "-suf"
-
-  annotations: {}
-
-  ## define resources
-  #resources:
-  #  limits:
-  #    cpu: 2
-  #    memory: 2000Mi
-  #  requests:
-  #    cpu: 500m
-  #    memory: 500Mi
+  resources:
+    limits:
+      cpu: '2'
+      memory: 3Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
 
   securityContext:
     runAsUser:
