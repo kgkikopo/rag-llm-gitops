@@ -288,8 +288,41 @@ TOOLS = [
     }
 ]
 
-def call_llm_with_tools(messages: list[dict]) -> tuple[list | None, str | None]:
-    """Calls vLLM with OpenAI tools. Returns (tool_calls, content) as structured JSON objects."""
+def extract_text_content(content) -> str:
+    """Extracts plain text string from strings, dicts, or Gradio multimodal lists."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and "text" in item:
+                parts.append(str(item["text"]))
+            elif isinstance(item, str):
+                parts.append(item)
+            else:
+                parts.append(str(item))
+        return "".join(parts)
+    if isinstance(content, dict) and "text" in content:
+        return str(content["text"])
+    return str(content) if content is not None else ""
+
+def format_messages_for_log(messages: list[dict], tools: list[dict] | None = None) -> str:
+    lines = []
+    for m in messages:
+        role = m.get("role", "unknown").upper()
+        content = extract_text_content(m.get("content", ""))
+        lines.append(f"--- [{role}] ---\n{content}")
+    if tools:
+        lines.append(f"--- [AVAILABLE TOOLS] ---\n{json.dumps(tools, indent=2)}")
+    return "\n".join(lines)
+
+def call_llm_with_tools_stream(messages: list[dict]):
+    """Streams completions from vLLM with tools.
+    Yields:
+      - ('delta', token_text) for real-time text streaming
+      - ('tool_calls', list_of_tool_calls) when tool invocation is requested
+      - ('direct_done', full_text) when direct response completes
+    """
     target_url = find_working_vllm_url()
     url = f"{target_url.rstrip('/')}/chat/completions"
     active_model = get_active_model_name()
@@ -299,30 +332,79 @@ def call_llm_with_tools(messages: list[dict]) -> tuple[list | None, str | None]:
         "tools": TOOLS,
         "tool_choice": "auto",
         "temperature": TEMPERATURE,
-        "top_p": TOP_P
+        "top_p": TOP_P,
+        "stream": True
     }
     if MAX_TOKENS is not None:
         payload["max_tokens"] = MAX_TOKENS
-    logger.info("========== [LLM TOOL CALL REQUEST] ==========\n%s\n=============================================", format_messages_for_log(messages))
-    resp = requests.post(url, json=payload, timeout=180, verify=False)
-    resp.raise_for_status()
-    data = resp.json()
-    msg = data["choices"][0]["message"]
-    tool_calls = msg.get("tool_calls")
-    content = msg.get("content")
-    if tool_calls:
-        logger.info("========== [LLM TOOL CALL RESPONSE] ==========\n%s\n==============================================", json.dumps(tool_calls, indent=2))
-    else:
-        logger.info("========== [LLM DIRECT RESPONSE] ==========\n%s\n===========================================", content)
-    return tool_calls, content
 
-def format_messages_for_log(messages: list[dict]) -> str:
-    lines = []
-    for m in messages:
-        role = m.get("role", "unknown").upper()
-        content = m.get("content", "")
-        lines.append(f"--- [{role}] ---\n{content}")
-    return "\n".join(lines)
+    logger.info("========== [LLM TOOL CALL REQUEST] ==========\n%s\n=============================================", format_messages_for_log(messages, tools=TOOLS))
+    resp = requests.post(url, json=payload, stream=True, timeout=180, verify=False)
+    resp.raise_for_status()
+
+    tool_calls_map = {}
+    direct_content_parts = []
+
+    for line in resp.iter_lines():
+        if not line:
+            continue
+        decoded = line.decode("utf-8").strip()
+        if not decoded.startswith("data: "):
+            continue
+        data_str = decoded[6:]
+        if data_str == "[DONE]":
+            break
+        try:
+            chunk = json.loads(data_str)
+            choices = chunk.get("choices", [])
+            if not choices:
+                continue
+            delta = choices[0].get("delta", {})
+
+            tc_deltas = delta.get("tool_calls")
+            if tc_deltas:
+                for tc in tc_deltas:
+                    idx = tc.get("index", 0)
+                    if idx not in tool_calls_map:
+                        tool_calls_map[idx] = {
+                            "id": tc.get("id", f"call_{idx}"),
+                            "type": tc.get("type", "function"),
+                            "function": {"name": "", "arguments": ""}
+                        }
+                    fn = tc.get("function", {})
+                    if "name" in fn and fn["name"]:
+                        tool_calls_map[idx]["function"]["name"] += fn["name"]
+                    if "arguments" in fn and fn["arguments"]:
+                        tool_calls_map[idx]["function"]["arguments"] += fn["arguments"]
+
+            content_chunk = delta.get("content")
+            if content_chunk:
+                direct_content_parts.append(content_chunk)
+                yield ("delta", content_chunk)
+        except Exception:
+            continue
+
+    if tool_calls_map:
+        tool_calls = [tool_calls_map[i] for i in sorted(tool_calls_map.keys())]
+        logger.info("========== [LLM TOOL CALL RESPONSE] ==========\n%s\n==============================================", json.dumps(tool_calls, indent=2))
+        yield ("tool_calls", tool_calls)
+    else:
+        full_content = "".join(direct_content_parts)
+        logger.info("========== [LLM DIRECT RESPONSE] ==========\n%s\n===========================================", full_content)
+        yield ("direct_done", full_content)
+
+def call_llm_with_tools(messages: list[dict]) -> tuple[list | None, str | None]:
+    """Synchronous compatibility wrapper for call_llm_with_tools_stream."""
+    tool_calls = None
+    direct_content = ""
+    for kind, data in call_llm_with_tools_stream(messages):
+        if kind == "delta":
+            direct_content += data
+        elif kind == "tool_calls":
+            tool_calls = data
+        elif kind == "direct_done":
+            direct_content = data
+    return tool_calls, direct_content
 
 def call_llm(messages: list[dict], max_tokens: int | None = None) -> str:
     """Calls vLLM OpenAI-compatible chat completions endpoint (synchronous)."""
@@ -450,12 +532,13 @@ def call_llm_stream(messages: list[dict], max_tokens: int | None = None):
 # --- Chat Assistant Logic ---
 def chat_respond(user_message: str, chat_history: list):
     history = list(chat_history) if chat_history else []
-    if not user_message or not user_message.strip():
+    clean_user = extract_text_content(user_message).strip()
+    if not clean_user:
         yield "", history
         return
 
     # 1. Immediately append user turn and placeholder assistant turn
-    history.append({"role": "user", "content": user_message})
+    history.append({"role": "user", "content": clean_user})
     history.append({"role": "assistant", "content": "..."})
     yield "", history
 
@@ -465,7 +548,7 @@ def chat_respond(user_message: str, chat_history: list):
     for item in history[:-2][-6:]:
         if isinstance(item, dict):
             role = item.get("role", "user")
-            content = item.get("content", "")
+            content = extract_text_content(item.get("content", ""))
             if role == "assistant":
                 if "</details>" in content:
                     content = content.split("</details>", 1)[-1].strip()
@@ -475,24 +558,29 @@ def chat_respond(user_message: str, chat_history: list):
                     content = content.split("---\n**Official OpenShift", 1)[0].strip()
                 if "---\n*(Note: Generated from base model" in content:
                     content = content.split("---\n*(Note:", 1)[0].strip()
-            if role in ("user", "assistant") and content:
+            if role in ("user", "assistant") and content.strip():
                 messages.append({"role": role, "content": content})
 
-    messages.append({"role": "user", "content": user_message})
+    messages.append({"role": "user", "content": clean_user})
 
-    # 2. Call LLM with native OpenAI tools (No regex)
-    tool_calls, direct_content = call_llm_with_tools(messages)
+    # 2. Call LLM with native OpenAI tools and real-time streaming
+    tool_calls = None
+    accumulated_direct = ""
+
+    for kind, data in call_llm_with_tools_stream(messages):
+        if kind == "delta":
+            accumulated_direct += data
+            history[-1] = {"role": "assistant", "content": accumulated_direct}
+            yield "", history
+        elif kind == "tool_calls":
+            tool_calls = data
+        elif kind == "direct_done":
+            history[-1] = {"role": "assistant", "content": data}
+            yield "", history
+            return
 
     if not tool_calls:
-        # LLM responded directly (greeting, casual conversation, or general knowledge)
-        accumulated = ""
-        words = (direct_content or "").split(" ")
-        for i, word in enumerate(words):
-            accumulated += (word + " " if i < len(words) - 1 else word)
-            history[-1] = {"role": "assistant", "content": accumulated}
-            if i % 3 == 0:
-                yield "", history
-        history[-1] = {"role": "assistant", "content": direct_content or ""}
+        history[-1] = {"role": "assistant", "content": accumulated_direct}
         yield "", history
         return
 
@@ -500,12 +588,12 @@ def chat_respond(user_message: str, chat_history: list):
     tc = tool_calls[0]
     raw_args = tc.get("function", {}).get("arguments", "{}")
     if isinstance(raw_args, dict):
-        target_query = raw_args.get("query", user_message)
+        target_query = raw_args.get("query", clean_user)
     else:
         try:
-            target_query = json.loads(raw_args).get("query", user_message)
+            target_query = json.loads(raw_args).get("query", clean_user)
         except Exception:
-            target_query = user_message
+            target_query = clean_user
 
     tool_initial = (
         f'<details style="margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
@@ -570,7 +658,7 @@ def chat_respond(user_message: str, chat_history: list):
         context_str = "\n\n".join(context_blocks)
         augmented_prompt = (
             f"[Official OpenShift 4.22 Documentation Tool Output for '{target_query}']:\n{context_str}\n\n"
-            f"User Question: {user_message}"
+            f"User Question: {clean_user}"
         )
         # Replace the last user message with augmented prompt
         augmented_messages = list(messages[:-1])

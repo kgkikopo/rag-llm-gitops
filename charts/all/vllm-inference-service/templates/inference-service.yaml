@@ -48,6 +48,18 @@ spec:
                 repo_id=model,
                 local_dir="/cache/models"
             )
+            import os, urllib.request
+            dest = "/cache/models/chat_template.jinja"
+            if not os.path.exists(dest):
+                try:
+                    print("[HF] Fetching official vLLM tool chat template for Gemma 4...")
+                    urllib.request.urlretrieve(
+                        "https://raw.githubusercontent.com/vllm-project/vllm/main/examples/tool_chat_template_gemma4.jinja",
+                        dest
+                    )
+                    print("[HF] Saved tool chat template to " + dest)
+                except Exception as e:
+                    print(f"[HF] Warning: Could not download template ({e})")
             PY
         env:
           - name: HF_HOME

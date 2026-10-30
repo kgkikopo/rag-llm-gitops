@@ -50,6 +50,7 @@ vllmServingRuntime:
     - "--enable-log-outputs"
     - "--enable-auto-tool-choice"
     - "--tool-call-parser=gemma4"
+    - "--chat-template=/cache/models/chat_template.jinja"
 
   logLevel: INFO
 
