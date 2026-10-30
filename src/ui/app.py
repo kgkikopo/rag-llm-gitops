@@ -45,7 +45,7 @@ if PGVECTOR_URL:
 
 # LLM parameters
 VLLM_URL = os.environ.get("VLLM_URL", "http://vllm-inference-service-predictor:8080/v1")
-MODEL_NAME = os.environ.get("MODEL_NAME", "google/gemma-3-4b-it")
+MODEL_NAME = os.environ.get("MODEL_NAME", "google/gemma-4-E4B-it")
 TEMPERATURE = float(os.environ.get("TEMPERATURE", "1.0"))
 TOP_P = float(os.environ.get("TOP_P", "0.95"))
 TOP_K = int(os.environ.get("TOP_K", "64"))
