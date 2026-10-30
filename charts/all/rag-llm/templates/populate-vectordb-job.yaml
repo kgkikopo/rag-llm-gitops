@@ -1,3 +1,4 @@
+{{- if and .Values.populateDbJob .Values.populateDbJob.enabled }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -180,3 +181,4 @@ spec:
       {{- end }}
       restartPolicy: {{ .Values.populateDbJob.restartPolicy }}
   backoffLimit: {{ .Values.populateDbJob.backoffLimit }}
+{{- end }}

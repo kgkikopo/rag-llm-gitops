@@ -160,6 +160,7 @@ route:
   # path: /
 
 populateDbJob:
+  enabled: false
   ## Job image
   image:
     repository: quay.io/hybridcloudpatterns/vector-embedder
