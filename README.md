@@ -10,7 +10,7 @@ The application includes an interface to compare responses generated directly by
 
 - **Documentation Ingestion**: Ingests documentation from the `enterprise-4.22` branch of [`openshift/openshift-docs`](https://github.com/openshift/openshift-docs).
 - **Model Stack**:
-  - **LLM**: `google/gemma-3-4b-it` served via vLLM in 16-bit precision (`--dtype=half`).
+  - **LLM**: `google/gemma-4-E4B-it` served via vLLM with FP8 quantization (`--quantization=fp8`, 32k context length).
   - **Embeddings**: `Qwen/Qwen3-Embedding-0.6B`.
   - **Vector Database**: `PGVECTOR` (PostgreSQL with `pgvector` extension).
 - **Comparison Interface**: Allows testing queries side-by-side to observe base model output versus retrieval-augmented output.
@@ -26,8 +26,8 @@ The application includes an interface to compare responses generated directly by
 |                                                                                         |
 |  +--------------------+        +---------------------+        +----------------------+  |
 |  | OpenShift GitOps   | -----> | vLLM Serving        | -----> | NVIDIA GPU Node      |  |
-|  | (Argo CD & Helm)   |        | google/gemma-3-4b-it|        | (16GB VRAM, e.g. T4) |  |
-|  +--------------------+        | 16-bit, 64k context |        | Usage: ~11.3 GB      |  |
+|  | (Argo CD & Helm)   |        | google/gemma-4-E4B-it|       | (e.g. L4 or T4)      |  |
+|  +--------------------+        | FP8, 32k context    |        |                      |  |
 |            |                   +---------------------+        +----------------------+  |
 |            v                              ^                              ^              |
 |            |                              |                              |              |
@@ -63,7 +63,7 @@ Gemma-3-4B uses a hybrid sliding window attention mechanism (local layers at 1,0
 
 ## Repository Structure
 
-1. **`charts/all/vllm-inference-service`**: Deploys `google/gemma-3-4b-it` using vLLM on a GPU-enabled node.
+1. **`charts/all/vllm-inference-service`**: Deploys `google/gemma-4-E4B-it` using vLLM on a GPU-enabled node.
 2. **`charts/all/rag-llm`**:
    - **`pgvector`**: PostgreSQL deployment with the `pgvector` extension.
    - **`populate-vectordb` Job**: Clones `openshift/openshift-docs` (`enterprise-4.22`), chunks markdown/adoc sources (chunk size: 2048, overlap: 200), computes embeddings, and stores them in PostgreSQL.
@@ -77,7 +77,7 @@ Gemma-3-4B uses a hybrid sliding window attention mechanism (local layers at 1,0
 ### 1. Prerequisites
 - Red Hat OpenShift Container Platform cluster.
 - At least one GPU node provisioned with NVIDIA GPU Operator and Node Feature Discovery.
-- A Hugging Face account with access to [google/gemma-3-4b-it](https://huggingface.co/google/gemma-3-4b-it) and a [Hugging Face User Access Token](https://huggingface.co/settings/tokens).
+- A Hugging Face account with access to [google/gemma-4-E4B-it](https://huggingface.co/google/gemma-4-E4B-it) and a [Hugging Face User Access Token](https://huggingface.co/settings/tokens).
 - A fork of this repository (`rag-llm-gitops`).
 
 ### 2. Configure Secrets
@@ -149,7 +149,7 @@ The following queries can be tested in the UI to compare responses from the base
    ```sh
    oc get pods -n vllm
    ```
-   - `hf-text-generation-server-...` (Running `google/gemma-3-4b-it` on GPU)
+   - `hf-text-generation-server-...` (Running `google/gemma-4-E4B-it` on GPU)
 
 3. **Access Application**:
    Navigate to OpenShift Web Console -> **Networking** -> **Routes** in the `rag-llm` namespace to access the application URL.
