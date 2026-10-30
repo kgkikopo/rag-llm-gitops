@@ -52,7 +52,7 @@ vllmServingRuntime:
     - "--reasoning-parser=gemma4"
 
   command:
-    - python
+    - python3
     - '-m'
     - vllm.entrypoints.openai.api_server
 
