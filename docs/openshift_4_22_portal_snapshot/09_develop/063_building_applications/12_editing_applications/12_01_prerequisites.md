@@ -1,0 +1,5 @@
+# 12.1. Prerequisites
+
+* You have the appropriate [roles and permissions](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/authentication_and_authorization/#default-roles_using-rbac) in a project to create and modify applications in OpenShift Container Platform. 
+  * You have [created and deployed an application on OpenShift Container Platform using the **Developer** perspective](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/building_applications/creating-applications#odc-creating-applications-using-developer-perspective "3.2. Creating applications by using the Developer perspective"). 
+  * You have [logged in to the web console](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/web_console/#web-console) and have switched to [the **Developer** perspective](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/web_console/#about-developer-perspective_web-console-overview).

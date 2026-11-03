@@ -1,0 +1,27 @@
+# 12.5. Collect Windows application event logs
+
+The `Get-WinEvent` shim on the kubelet `logs` endpoint can be used to collect application event logs from Windows machines. 
+
+**Prerequisites**
+
+  * You installed the Windows Machine Config Operator (WMCO) using Operator Lifecycle Manager (OLM). 
+  * You have created a Windows compute machine set. 
+
+
+
+**Procedure**
+
+  * To view logs from all applications logging to the event logs on the Windows machine, run: 
+
+```shell-session
+$ oc adm node-logs -l kubernetes.io/os=windows --path=journal
+```
+
+
+The same command is executed when collecting logs with `oc adm must-gather`. 
+
+Other Windows application logs from the event log can also be collected by specifying the respective service with a `-u` flag. For example, you can run the following command to collect logs for the containerd container runtime service: 
+
+```shell-session
+$ oc adm node-logs -l kubernetes.io/os=windows --path=journal -u containerd
+```

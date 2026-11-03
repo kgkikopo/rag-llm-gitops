@@ -1,0 +1,79 @@
+# 17.9. Configure Hyper-Threading for a cluster
+
+To configure Hyper-Threading for an OpenShift Container Platform cluster, set the CPU threads in the performance profile to the same cores that are configured for the reserved or isolated CPU pools. 
+
+Note
+
+If you configure a performance profile, and subsequently change the Hyper-Threading configuration for the host, ensure that you update the CPU `isolated` and `reserved` fields in the `PerformanceProfile` YAML to match the new configuration. 
+
+Warning
+
+Disabling a previously enabled host Hyper-Threading configuration can cause the CPU core IDs listed in the `PerformanceProfile` YAML to be incorrect. This incorrect configuration can cause the node to become unavailable because the listed CPUs can no longer be found. 
+
+**Prerequisites**
+
+  * Access to the cluster as a user with the `cluster-admin` role. 
+  * Install the OpenShift CLI (`oc`). 
+
+
+
+**Procedure**
+
+  1. Ascertain which threads are running on what CPUs for the host you want to configure. 
+
+You can view which threads are running on the host CPUs by logging in to the cluster and running the following command: 
+
+```shell-session
+$ lscpu --all --extended
+```
+
+
+**Example output**
+
+```shell-session
+CPU NODE SOCKET CORE L1d:L1i:L2:L3 ONLINE MAXMHZ    MINMHZ
+0   0    0      0    0:0:0:0       yes    4800.0000 400.0000
+1   0    0      1    1:1:1:0       yes    4800.0000 400.0000
+2   0    0      2    2:2:2:0       yes    4800.0000 400.0000
+3   0    0      3    3:3:3:0       yes    4800.0000 400.0000
+4   0    0      0    0:0:0:0       yes    4800.0000 400.0000
+5   0    0      1    1:1:1:0       yes    4800.0000 400.0000
+6   0    0      2    2:2:2:0       yes    4800.0000 400.0000
+7   0    0      3    3:3:3:0       yes    4800.0000 400.0000
+```
+
+
+In this example, there are eight logical CPU cores running on four physical CPU cores. CPU0 and CPU4 are running on physical Core0, CPU1 and CPU5 are running on physical Core 1, and so on. Alternatively, to view the threads that are set for a particular physical CPU core (`cpu0` in the example below), open a shell prompt and run the following: 
+
+```shell-session
+$ cat /sys/devices/system/cpu/cpu0/topology/thread_siblings_list
+```
+
+
+**Example output**
+
+```shell-session
+0-4
+```
+
+
+  2. Apply the isolated and reserved CPUs in the `PerformanceProfile` YAML. For example, you can set logical cores CPU0 and CPU4 as `isolated`, and logical cores CPU1 to CPU3 and CPU5 to CPU7 as `reserved`. When you configure reserved and isolated CPUs, the infra containers in pods use the reserved CPUs and the application containers use the isolated CPUs. 
+
+```yaml
+...
+  cpu:
+    isolated: 0,4
+    reserved: 1-3,5-7
+...
+```
+
+
+Note
+
+The reserved and isolated CPU pools must not overlap and together must span all available cores in the worker node. 
+
+Important
+
+Hyper-Threading is enabled by default on most Intel processors. If you enable Hyper-Threading, all threads processed by a particular core must be isolated or processed on the same core. 
+
+When Hyper-Threading is enabled, all guaranteed pods must use multiples of the simultaneous multi-threading (SMT) level to avoid a "noisy neighbor" situation that can cause the pod to fail. See [Static policy options](https://kubernetes.io/docs/tasks/administer-cluster/cpu-management-policies/#static-policy-options) for more information.

@@ -1,0 +1,550 @@
+# 2.4. Container image signatures
+
+To verify the integrity of the images in the Red Hat Container Registries between Red Hat registries and your infrastructure, you can enable signature verification. 
+
+Red Hat delivers signatures for the images in the Red Hat Container Registries. Those signatures can be automatically verified when being pulled to OpenShift Container Platform 4 clusters by using the Machine Config Operator (MCO). 
+
+To verify the integrity of those images between Red Hat registries and your infrastructure, enable signature verification. 
+
+## 2.4.1. Enable signature verification for Red Hat Container Registries
+
+To verify the integrity of the images in the Red Hat Container Registries, you can enable container signature validation for Red Hat Container Registries by writing a signature verification policy file specifying the keys to verify images from these registries. 
+
+For RHEL8 nodes, the registries are already defined in `/etc/containers/registries.d` by default. 
+
+**Procedure**
+
+  1. Create a Butane config file, `51-worker-rh-registry-trust.bu`, containing the necessary configuration for the worker nodes. 
+
+Note
+
+The [Butane version](https://coreos.github.io/butane/specs/) you specify in the config file should match the OpenShift Container Platform version and always ends in `0`. For example, `4.22.0`. See "Creating machine configs with Butane" for information about Butane. 
+
+```yaml
+variant: openshift
+version: 4.22.0
+metadata:
+  name: 51-worker-rh-registry-trust
+  labels:
+    machineconfiguration.openshift.io/role: worker
+storage:
+  files:
+  - path: /etc/containers/policy.json
+    mode: 0644
+    overwrite: true
+    contents:
+      inline: |
+        {
+          "default": [
+            {
+              "type": "insecureAcceptAnything"
+            }
+          ],
+          "transports": {
+            "docker": {
+              "registry.access.redhat.com": [
+                {
+                  "type": "signedBy",
+                  "keyType": "GPGKeys",
+                  "keyPath": "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release"
+                }
+              ],
+              "registry.redhat.io": [
+                {
+                  "type": "signedBy",
+                  "keyType": "GPGKeys",
+                  "keyPath": "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release"
+                }
+              ]
+            },
+            "docker-daemon": {
+              "": [
+                {
+                  "type": "insecureAcceptAnything"
+                }
+              ]
+            }
+          }
+        }
+```
+
+
+  2. Use Butane to generate a machine config YAML file, `51-worker-rh-registry-trust.yaml`, containing the file to be written to disk on the worker nodes: 
+
+```shell-session
+$ butane 51-worker-rh-registry-trust.bu -o 51-worker-rh-registry-trust.yaml
+```
+
+
+  3. Apply the created machine config: 
+
+```shell-session
+$ oc apply -f 51-worker-rh-registry-trust.yaml
+```
+
+
+  4. Check that the worker machine config pool has rolled out with the new machine config: 
+
+     1. Check that the new machine config was created: 
+
+```shell-session
+$ oc get mc
+```
+
+
+**Sample output**
+
+```shell-session
+NAME                                               GENERATEDBYCONTROLLER                      IGNITIONVERSION   AGE
+00-master                                          a2178ad522c49ee330b0033bb5cb5ea132060b0a   3.5.0             25m
+00-worker                                          a2178ad522c49ee330b0033bb5cb5ea132060b0a   3.5.0             25m
+01-master-container-runtime                        a2178ad522c49ee330b0033bb5cb5ea132060b0a   3.5.0             25m
+01-master-kubelet                                  a2178ad522c49ee330b0033bb5cb5ea132060b0a   3.5.0             25m
+01-worker-container-runtime                        a2178ad522c49ee330b0033bb5cb5ea132060b0a   3.5.0             25m
+01-worker-kubelet                                  a2178ad522c49ee330b0033bb5cb5ea132060b0a   3.5.0             25m
+51-master-rh-registry-trust                                                                   3.5.0             13s
+51-worker-rh-registry-trust                                                                   3.5.0             53s
+99-master-generated-crio-seccomp-use-default                                                  3.5.0             25m
+99-master-generated-registries                     a2178ad522c49ee330b0033bb5cb5ea132060b0a   3.5.0             25m
+99-master-ssh                                                                                 3.2.0             28m
+99-worker-generated-crio-seccomp-use-default                                                  3.5.0             25m
+99-worker-generated-registries                     a2178ad522c49ee330b0033bb5cb5ea132060b0a   3.5.0             25m
+99-worker-ssh                                                                                 3.2.0             28m
+rendered-master-af1e7ff78da0a9c851bab4be2777773b   a2178ad522c49ee330b0033bb5cb5ea132060b0a   3.5.0             8s
+rendered-master-cd51fd0c47e91812bfef2765c52ec7e6   a2178ad522c49ee330b0033bb5cb5ea132060b0a   3.5.0             24m
+rendered-worker-2b52f75684fbc711bd1652dd86fd0b82   a2178ad522c49ee330b0033bb5cb5ea132060b0a   3.5.0             24m
+rendered-worker-be3b3bce4f4aa52a62902304bac9da3c   a2178ad522c49ee330b0033bb5cb5ea132060b0a   3.5.0             48s
+```
+
+
+where: 
+
+`51-worker-rh-registry-trust`
+     Specifies the new machine config. 
+`rendered-worker-be3b3bce4f4aa52a62902304bac9da3c`
+     Specifies the new rendered machine config. 
+
+     2. Check that the worker machine config pool is updating with the new machine config: 
+
+```shell-session
+$ oc get mcp
+```
+
+
+**Sample output**
+
+```shell-session
+NAME     CONFIG                                             UPDATED   UPDATING   DEGRADED   MACHINECOUNT   READYMACHINECOUNT   UPDATEDMACHINECOUNT   DEGRADEDMACHINECOUNT   AGE
+master   rendered-master-af1e7ff78da0a9c851bab4be2777773b   True      False      False      3              3                   3                     0                      30m
+worker   rendered-worker-be3b3bce4f4aa52a62902304bac9da3c   False     True       False      3              0                   0                     0                      30m
+```
+
+
+When the `UPDATING` field is `True`, the machine config pool is updating with the new machine config. When the field becomes `False`, the worker machine config pool has rolled out to the new machine config. 
+
+  5. If your cluster uses any RHEL7 worker nodes, when the worker machine config pool is updated, create YAML files on those nodes in the `/etc/containers/registries.d` directory, which specify the location of the detached signatures for a given registry server. The following example works only for images hosted in `registry.access.redhat.com` and `registry.redhat.io`. 
+
+     1. Start a debug session to each RHEL7 worker node: 
+
+```shell-session
+$ oc debug node/<node_name>
+```
+
+
+     2. Change your root directory to `/host`: 
+
+```shell-session
+sh-4.2# chroot /host
+```
+
+
+     3. Create a `/etc/containers/registries.d/registry.redhat.io.yaml` file that contains the following: 
+
+```shell-session
+docker:
+     registry.redhat.io:
+         sigstore: https://registry.redhat.io/containers/sigstore
+```
+
+
+     4. Create a `/etc/containers/registries.d/registry.access.redhat.com.yaml` file that contains the following: 
+
+```shell-session
+docker:
+     registry.access.redhat.com:
+         sigstore: https://access.redhat.com/webassets/docker/content/sigstore
+```
+
+
+     5. Exit the debug session. 
+
+
+
+
+## 2.4.2. Verify the signature verification configuration
+
+After you apply the machine configs to the cluster, you can verify that the Machine Config Controller detected the new `MachineConfig` object and generated a new `rendered-worker-<hash>` version. 
+
+**Prerequisites**
+
+  * You enabled signature verification by using a machine config file. 
+
+
+
+**Procedure**
+
+  1. On the command line, run the following command to display information about a required worker: 
+
+```shell-session
+$ oc describe machineconfigpool/worker
+```
+
+
+**Example output of initial worker monitoring**
+
+```shell-session
+Name:         worker
+Namespace:
+Labels:       machineconfiguration.openshift.io/mco-built-in=
+Annotations:  <none>
+API Version:  machineconfiguration.openshift.io/v1
+Kind:         MachineConfigPool
+Metadata:
+  Creation Timestamp:  2019-12-19T02:02:12Z
+  Generation:          3
+  Resource Version:    16229
+  Self Link:           /apis/machineconfiguration.openshift.io/v1/machineconfigpools/worker
+  UID:                 92697796-2203-11ea-b48c-fa163e3940e5
+Spec:
+  Configuration:
+    Name:  rendered-worker-f6819366eb455a401c42f8d96ab25c02
+    Source:
+      API Version:  machineconfiguration.openshift.io/v1
+      Kind:         MachineConfig
+      Name:         00-worker
+      API Version:  machineconfiguration.openshift.io/v1
+      Kind:         MachineConfig
+      Name:         01-worker-container-runtime
+      API Version:  machineconfiguration.openshift.io/v1
+      Kind:         MachineConfig
+      Name:         01-worker-kubelet
+      API Version:  machineconfiguration.openshift.io/v1
+      Kind:         MachineConfig
+      Name:         51-worker-rh-registry-trust
+      API Version:  machineconfiguration.openshift.io/v1
+      Kind:         MachineConfig
+      Name:         99-worker-92697796-2203-11ea-b48c-fa163e3940e5-registries
+      API Version:  machineconfiguration.openshift.io/v1
+      Kind:         MachineConfig
+      Name:         99-worker-ssh
+  Machine Config Selector:
+    Match Labels:
+      machineconfiguration.openshift.io/role:  worker
+  Node Selector:
+    Match Labels:
+      node-role.kubernetes.io/worker:
+  Paused:                              false
+Status:
+  Conditions:
+    Last Transition Time:  2019-12-19T02:03:27Z
+    Message:
+    Reason:
+    Status:                False
+    Type:                  RenderDegraded
+    Last Transition Time:  2019-12-19T02:03:43Z
+    Message:
+    Reason:
+    Status:                False
+    Type:                  NodeDegraded
+    Last Transition Time:  2019-12-19T02:03:43Z
+    Message:
+    Reason:
+    Status:                False
+    Type:                  Degraded
+    Last Transition Time:  2019-12-19T02:28:23Z
+    Message:
+    Reason:
+    Status:                False
+    Type:                  Updated
+    Last Transition Time:  2019-12-19T02:28:23Z
+    Message:               All nodes are updating to rendered-worker-f6819366eb455a401c42f8d96ab25c02
+    Reason:
+    Status:                True
+    Type:                  Updating
+  Configuration:
+    Name:  rendered-worker-d9b3f4ffcfd65c30dcf591a0e8cf9b2e
+    Source:
+      API Version:            machineconfiguration.openshift.io/v1
+      Kind:                   MachineConfig
+      Name:                   00-worker
+      API Version:            machineconfiguration.openshift.io/v1
+      Kind:                   MachineConfig
+      Name:                   01-worker-container-runtime
+      API Version:            machineconfiguration.openshift.io/v1
+      Kind:                   MachineConfig
+      Name:                   01-worker-kubelet
+      API Version:            machineconfiguration.openshift.io/v1
+      Kind:                   MachineConfig
+      Name:                   99-worker-92697796-2203-11ea-b48c-fa163e3940e5-registries
+      API Version:            machineconfiguration.openshift.io/v1
+      Kind:                   MachineConfig
+      Name:                   99-worker-ssh
+  Degraded Machine Count:     0
+  Machine Count:              1
+  Observed Generation:        3
+  Ready Machine Count:        0
+  Unavailable Machine Count:  1
+  Updated Machine Count:      0
+Events:                       <none>
+```
+
+
+  2. Run the `oc describe` command again: 
+
+```shell-session
+$ oc describe machineconfigpool/worker
+```
+
+
+**Example output after the worker is updated**
+
+```shell-session
+...
+    Last Transition Time:  2019-12-19T04:53:09Z
+    Message:               All nodes are updated with rendered-worker-f6819366eb455a401c42f8d96ab25c02
+    Reason:
+    Status:                True
+    Type:                  Updated
+    Last Transition Time:  2019-12-19T04:53:09Z
+    Message:
+    Reason:
+    Status:                False
+    Type:                  Updating
+  Configuration:
+    Name:  rendered-worker-f6819366eb455a401c42f8d96ab25c02
+    Source:
+      API Version:            machineconfiguration.openshift.io/v1
+      Kind:                   MachineConfig
+      Name:                   00-worker
+      API Version:            machineconfiguration.openshift.io/v1
+      Kind:                   MachineConfig
+      Name:                   01-worker-container-runtime
+      API Version:            machineconfiguration.openshift.io/v1
+      Kind:                   MachineConfig
+      Name:                   01-worker-kubelet
+      API Version:            machineconfiguration.openshift.io/v1
+      Kind:                   MachineConfig
+      Name:                   51-worker-rh-registry-trust
+      API Version:            machineconfiguration.openshift.io/v1
+      Kind:                   MachineConfig
+      Name:                   99-worker-92697796-2203-11ea-b48c-fa163e3940e5-registries
+      API Version:            machineconfiguration.openshift.io/v1
+      Kind:                   MachineConfig
+      Name:                   99-worker-ssh
+  Degraded Machine Count:     0
+  Machine Count:              3
+  Observed Generation:        4
+  Ready Machine Count:        3
+  Unavailable Machine Count:  0
+  Updated Machine Count:      3
+...
+```
+
+
+Note
+
+The `Observed Generation` parameter shows an increased count based on the generation of the controller-produced configuration. This controller updates this value even if it fails to process the specification and generate a revision. The `Configuration Source` value points to the `51-worker-rh-registry-trust` configuration. 
+
+  3. Confirm that the `policy.json` file exists with the following command: 
+
+```shell-session
+$ oc debug node/<node> -- chroot /host cat /etc/containers/policy.json
+```
+
+
+**Example output**
+
+```shell-session
+Starting pod/<node>-debug ...
+To use host binaries, run `chroot /host`
+{
+  "default": [
+    {
+      "type": "insecureAcceptAnything"
+    }
+  ],
+  "transports": {
+    "docker": {
+      "registry.access.redhat.com": [
+        {
+          "type": "signedBy",
+          "keyType": "GPGKeys",
+          "keyPath": "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release"
+        }
+      ],
+      "registry.redhat.io": [
+        {
+          "type": "signedBy",
+          "keyType": "GPGKeys",
+          "keyPath": "/etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release"
+        }
+      ]
+    },
+    "docker-daemon": {
+      "": [
+        {
+          "type": "insecureAcceptAnything"
+        }
+      ]
+    }
+  }
+}
+```
+
+
+  4. Confirm that the `registry.redhat.io.yaml` file exists with the following command: 
+
+```shell-session
+$ oc debug node/<node> -- chroot /host cat /etc/containers/registries.d/registry.redhat.io.yaml
+```
+
+
+**Example output**
+
+```shell-session
+Starting pod/<node>-debug ...
+To use host binaries, run `chroot /host`
+docker:
+     registry.redhat.io:
+         sigstore: https://registry.redhat.io/containers/sigstore
+```
+
+
+  5. Confirm that the `registry.access.redhat.com.yaml` file exists with the following command: 
+
+```shell-session
+$ oc debug node/<node> -- chroot /host cat /etc/containers/registries.d/registry.access.redhat.com.yaml
+```
+
+
+**Example output**
+
+```shell-session
+Starting pod/<node>-debug ...
+To use host binaries, run `chroot /host`
+docker:
+     registry.access.redhat.com:
+         sigstore: https://access.redhat.com/webassets/docker/content/sigstore
+```
+
+
+## 2.4.3. Understand the verification of container images lacking verifiable signatures
+
+Each OpenShift Container Platform release image is immutable and signed with a Red Hat production key. During cluster update or installation, a release image might deploy container images without a verifiable signature. The signature on the release image validates all release contents transitively. 
+
+For example, the image references lacking a verifiable signature are contained in the signed OpenShift Container Platform release image: 
+
+**Example release info output**
+
+```shell-session
+$ oc adm release info quay.io/openshift-release-dev/ocp-release@sha256:2309578b68c5666dad62aed696f1f9d778ae1a089ee461060ba7b9514b7ca417 -o pullspec
+quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:9aafb914d5d7d0dec4edd800d02f811d7383a7d49e500af548eab5d00c1bffdb
+```
+
+
+The first line specifies the signed release image SHA. The second line specifies a container image lacking a verifiable signature that is included in the release. 
+
+### 2.4.3.1. Automated verification during updates
+
+Verification of signatures is automatic. The OpenShift Cluster Version Operator (CVO) verifies signatures on the release images during an OpenShift Container Platform update. This is an internal process. An OpenShift Container Platform installation or update fails if the automated verification fails. 
+
+Verification of signatures can also be done manually using the `skopeo` command-line utility. 
+
+### 2.4.3.2. Use skopeo to verify signatures of Red Hat container images
+
+You can verify the signatures for container images included in an OpenShift Container Platform release image by pulling those signatures from the OpenShift Container Platform release mirror site. 
+
+Because the signatures on the mirror site are not in a format readily understood by Podman or CRI-O, you can use the `skopeo standalone-verify` command to verify that your release images are signed by Red Hat. 
+
+**Prerequisites**
+
+  * You have installed the `skopeo` command-line utility. 
+
+
+
+**Procedure**
+
+  1. Get the full SHA for your release by running the following command: 
+
+```shell-session
+$ oc adm release info <release_version>
+```
+
+
+     * Substitute <release_version> with your release number, for example, `4.14.3`. 
+
+**Example output snippet**
+
+```shell-session
+---
+Pull From: quay.io/openshift-release-dev/ocp-release@sha256:e73ab4b33a9c3ff00c9f800a38d69853ca0c4dfa5a88e3df331f66df8f18ec55
+---
+```
+
+
+  2. Pull down the Red Hat release key by running the following command: 
+
+```shell-session
+$ curl -o pub.key https://access.redhat.com/security/data/fd431d51.txt
+```
+
+
+  3. Get the signature file for the specific release that you want to verify by running the following command: 
+
+```shell-session
+$ curl -o signature-1 https://mirror.openshift.com/pub/openshift-v4/signatures/openshift-release-dev/ocp-release/sha256=<sha_from_version>/signature-1
+```
+
+
+Replace `<sha_from_version>` with SHA value from the full link to the mirror site that matches the SHA of your release. For example, the link to the signature for the 4.12.23 release is `<https://mirror.openshift.com/pub/openshift-v4/signatures/openshift-release-dev/ocp-release/sha256=e73ab4b33a9c3ff00c9f800a38d69853ca0c4dfa5a88e3df331f66df8f18ec55/signature-1>`, and the SHA value is `e73ab4b33a9c3ff00c9f800a38d69853ca0c4dfa5a88e3df331f66df8f18ec55`. 
+
+  4. Get the manifest for the release image by running the following command: 
+
+```shell-session
+$ skopeo inspect --raw docker://<quay_link_to_release> > manifest.json
+```
+
+
+Replace `<quay_link_to_release>` with the output of the `oc adm release info` command. For example, `quay.io/openshift-release-dev/ocp-release@sha256:e73ab4b33a9c3ff00c9f800a38d69853ca0c4dfa5a88e3df331f66df8f18ec55`. 
+
+  5. Use skopeo to verify the signature: 
+
+```shell-session
+$ skopeo standalone-verify manifest.json quay.io/openshift-release-dev/ocp-release:<release_number>-<arch> any signature-1 --public-key-file pub.key
+```
+
+
+where: 
+
+`<release_number>`
+     Specifies the release number, for example `4.14.3`. 
+`<arch>`
+    
+
+Specifies the architecture, for example `x86_64`. 
+
+**Example output**
+
+```shell-session
+Signature verified using fingerprint 567E347AD0044ADE55BA8A5F199E2F91FD431D51, digest sha256:e73ab4b33a9c3ff00c9f800a38d69853ca0c4dfa5a88e3df331f66df8f18ec55
+```
+
+
+## 2.4.4. Additional resources
+
+  * [Quay.io](https://quay.io/)
+  * [Red Hat Ecosystem Catalog Container images](https://catalog.redhat.com/software/containers/explore)
+  * [Introduction to OpenShift Updates](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/#understanding-openshift-updates)
+  * [Machine Config Overview](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/machine_configuration/#machine-config-overview)
+  * [OpenShift release signatures mirror site](https://mirror.openshift.com/pub/openshift-v4/signatures/openshift-release-dev/ocp-release/)
+  * [Red Hat GPG release key](https://access.redhat.com/security/data/fd431d51.txt)

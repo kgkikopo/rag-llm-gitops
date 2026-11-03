@@ -1,0 +1,15 @@
+# Chapter 4. Certificate types and descriptions
+
+- [4.1. User-provided certificates for the API server](04_01_user_provided_certificates_for_the_api_server.md)
+- [4.2. Proxy certificates](04_02_proxy_certificates.md)
+- [4.3. Service CA certificates](04_03_service_ca_certificates.md)
+- [4.4. Node certificates](04_04_node_certificates.md)
+- [4.5. Bootstrap certificates](04_05_bootstrap_certificates.md)
+- [4.6. etcd certificates](04_06_etcd_certificates.md)
+- [4.7. OLM certificates](04_07_olm_certificates.md)
+- [4.8. Aggregated API client certificates](04_08_aggregated_api_client_certificates.md)
+- [4.9. Machine Config Operator certificates](04_09_machine_config_operator_certificates.md)
+- [4.10. User-provided certificates for default ingress](04_10_user_provided_certificates_for_default_ingress.md)
+- [4.11. Ingress certificates](04_11_ingress_certificates.md)
+- [4.12. Monitoring and OpenShift Logging Operator component certificates](04_12_monitoring_and_openshift_logging_operator_component_certificates.md)
+- [4.13. Control plane certificates](04_13_control_plane_certificates.md)

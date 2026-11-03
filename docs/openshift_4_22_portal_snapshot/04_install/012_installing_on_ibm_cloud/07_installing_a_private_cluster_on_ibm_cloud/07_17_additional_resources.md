@@ -1,0 +1,4 @@
+# 7.17. Additional resources
+
+* [Customize your cluster](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/postinstallation_configuration/#available_cluster_customizations)
+  * [About remote health monitoring](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/support/#about-remote-health-monitoring)

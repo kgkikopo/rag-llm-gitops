@@ -1,0 +1,10 @@
+# 1.3. Additional resources
+
+* [Installing a cluster on IBM Power®](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_ibm_power/#installing-ibm-power)
+  * [Rotating API keys](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/postinstallation_configuration/#refreshing-service-ids-ibm-cloud_changing-cloud-credentials-configuration)
+  * [Installation process](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/architecture/#installation-process_architecture-installation)
+  * [Installing a customized cluster on IBM Power® Virtual Server](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_ibm_power_virtual_server/installing-ibm-power-vs-customizations "Chapter 4. Installing a cluster on IBM Power Virtual Server with customizations")
+  * [Installing a cluster on IBM Power® Virtual Server into an existing VPC](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_ibm_power_virtual_server/installing-ibm-powervs-vpc "Chapter 5. Installing a cluster on IBM Power Virtual Server into an existing VPC")
+  * [Installing a private cluster on IBM Power® Virtual Server](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_ibm_power_virtual_server/installing-ibm-power-vs-private-cluster "Chapter 6. Installing a private cluster on IBM Power Virtual Server")
+  * [Installing a cluster on IBM Power® Virtual Server in a restricted network](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_ibm_power_virtual_server/installing-restricted-networks-ibm-power-vs "Chapter 7. Installing a cluster on IBM Power Virtual Server in a disconnected environment")
+  * [Configuring an IBM Cloud® account](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_ibm_power_virtual_server/installing-ibm-cloud-account-power-vs "Chapter 2. Configuring an IBM Cloud account")

@@ -1,0 +1,54 @@
+# 2.1. Introduction to Red Hat build of Kueue
+
+Red Hat build of Kueue is a job queuing system that decides when workloads start, wait, or are preempted on a shared cluster. Review the following topics to learn what Red Hat build of Kueue does, which personas interact with it, and how a job moves through the queuing workflow. 
+
+## 2.1.1. Red Hat build of Kueue overview
+
+You can use Red Hat build of Kueue to manage when jobs in your Kubernetes cluster start, get preempted, or wait for resources. Red Hat build of Kueue optimizes resource utilization by enforcing quotas and scheduling policies across your workloads. 
+
+Red Hat build of Kueue can determine when a job waits, is admitted to start by creating pods, or should be _preempted_ , meaning that active pods for that job are deleted. 
+
+Note
+
+In the context of Red Hat build of Kueue, a job can be defined as a one-time or on-demand task that runs to completion. 
+
+Red Hat build of Kueue is based on the Kueue open source project. 
+
+Red Hat build of Kueue is compatible with environments that use heterogeneous, elastic resources, where many different resource types exist and those resources are capable of dynamic scaling. 
+
+Red Hat build of Kueue does not replace any existing components in a Kubernetes cluster, but instead integrates with the existing Kubernetes API server, scheduler, and cluster autoscaler components. 
+
+Red Hat build of Kueue supports all-or-nothing semantics, where either an entire job with all of its components is admitted to the cluster, or the entire job is rejected if it does not fit on the cluster. 
+
+## 2.1.2. Red Hat build of Kueue personas
+
+Different personas exist in a Red Hat build of Kueue workflow. Identifying which persona matches your role tells you which quota configuration and job submission tasks apply to you. 
+
+Batch administrators
+     Batch administrators manage the cluster infrastructure and establish quotas and queues. 
+Batch users
+     Batch users run jobs on the cluster. Examples of batch users might be researchers, AI/ML engineers, or data scientists. 
+Serving users
+     Serving users run jobs on the cluster. For example, to expose a trained AI/ML model for inference. 
+Platform developers
+     Platform developers integrate Red Hat build of Kueue with other software. They might also contribute to the Kueue open source project. 
+
+## 2.1.3. Red Hat build of Kueue workflow overview
+
+A Red Hat build of Kueue workflow coordinates batch administrators, user personas, and existing Kubernetes components so that jobs are admitted only when quota is available. 
+
+The Red Hat build of Kueue workflow can be described at a high level as follows: 
+
+  1. Batch administrators create and configure `ResourceFlavor`, `LocalQueue`, and `ClusterQueue` resources. 
+  2. User personas create jobs on the cluster. 
+  3. The Kubernetes API server validates and accepts job data. 
+  4. Red Hat build of Kueue admits jobs based on configured options, such as order or quota. It injects affinity into the job by using resource flavors, and creates a `Workload` object that corresponds to each job. 
+  5. The applicable controller for the job type creates pods. 
+  6. The Kubernetes scheduler assigns pods to a node in the cluster. 
+  7. The Kubernetes cluster autoscaler provisions more nodes as required. 
+
+
+
+## 2.1.4. Additional resources
+
+  * [Kueue (upstream documentation)](https://kueue.sigs.k8s.io/docs/)

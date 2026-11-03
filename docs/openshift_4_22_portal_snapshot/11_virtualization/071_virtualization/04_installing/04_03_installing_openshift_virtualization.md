@@ -1,0 +1,272 @@
+# 4.3. Installing OpenShift Virtualization
+
+Install OpenShift Virtualization to add virtualization functionality to your OpenShift Container Platform cluster. 
+
+Important
+
+If you install OpenShift Virtualization in a restricted environment with no internet connectivity, you must configure Operator Lifecycle Manager (OLM) for a disconnected environment. 
+
+If you have limited internet connectivity, you can configure proxy support in OLM to access the software catalog. 
+
+## 4.3.1. Installation methods for OpenShift Virtualization
+
+You can install OpenShift Virtualization on your OpenShift Container Platform cluster by using Operator Lifecycle Manager (OLM), agent-based installation, or the Assisted Installer. 
+
+Standard installation by using Operator Lifecycle Manager (OLM)
+    
+
+Install the OpenShift Virtualization Operator from the OpenShift Container Platform web console or CLI. This method is suitable for most deployment scenarios and provides the most flexibility for cluster configuration. 
+
+For disconnected environments, you must configure OLM for restricted networks before installing OpenShift Virtualization. 
+
+Agent-based installation
+     Use the Agent-based Installer to deploy a cluster with OpenShift Virtualization and related operators pre-configured. This installation method is designed for users who want a streamlined, UI-driven installation experience, particularly in disconnected environments. 
+Assisted Installer with virtualization bundle
+     Use the Assisted Installer to deploy OpenShift Virtualization or Red Hat OpenShift Virtualization Engine by using the virtualization operator bundle, which includes OpenShift Virtualization and essential supporting operators. This installation method simplifies the deployment process by pre-configuring operators and minimizing external dependencies. This is the preferred installation method for OpenShift Virtualization Engine. 
+
+### 4.3.1.1. Choosing an installation method
+
+Consider the following factors when choosing an installation method: 
+
+  * Network connectivity: For disconnected or air-gapped environments, the Agent-based Installer or Assisted Installer with the virtualization bundle can simplify deployment by reducing registry dependencies. 
+  * Installation experience: If you prefer a UI-driven installation workflow over writing YAML files, consider using the Agent-based Installer or Assisted Installer. 
+  * Operator requirements: If you need additional operators such as the Node Health Check Operator, Fence Agents Remediation Operator, or NMState Operator, the Assisted Installer virtualization bundle includes these operators by default. 
+  * Customization needs: For maximum flexibility in cluster configuration, use the standard OLM installation method. 
+
+
+
+## 4.3.2. Install the OpenShift Virtualization Operator by using the web console
+
+You can deploy the OpenShift Virtualization Operator by using the OpenShift Container Platform web console. 
+
+**Prerequisites**
+
+  * Install OpenShift Container Platform 4.22 on your cluster. 
+  * Log in to the OpenShift Container Platform web console as a user with `cluster-admin` permissions. 
+
+
+
+**Procedure**
+
+  1. From the **Administrator** perspective, click **Ecosystem** **Software Catalog**. 
+  2. In the **Filter by keyword** field, type **Virtualization**. 
+  3. Select the **OpenShift Virtualization Operator** tile with the **Red Hat** source label. 
+  4. Read the information about the Operator and click **Install**. 
+  5. On the **Install Operator** page: 
+
+     1. Select **stable** from the list of available **Update Channel** options. This ensures that you install the version of OpenShift Virtualization that is compatible with your OpenShift Container Platform version. 
+     2. For **Installed Namespace** , ensure that the **Operator recommended namespace** option is selected. This installs the Operator in the mandatory `openshift-cnv` namespace, which is automatically created if it does not exist. 
+
+Warning
+
+Attempting to install the OpenShift Virtualization Operator in a namespace other than `openshift-cnv` causes the installation to fail. 
+
+     3. For **Approval Strategy** , it is highly recommended that you select **Automatic** , which is the default value, so that OpenShift Virtualization automatically updates when a new version is available in the **stable** update channel. 
+
+Selecting the **Manual** approval strategy is not recommended, as it poses a high risk to cluster support and functionality. Only select **Manual** if you fully understand these risks and cannot use **Automatic**. 
+
+Warning
+
+Because OpenShift Virtualization is only supported when used with the corresponding OpenShift Container Platform version, missing OpenShift Virtualization updates can cause your cluster to become unsupported. 
+
+  6. Click **Install** to make the Operator available to the `openshift-cnv` namespace. 
+  7. When the Operator installs successfully, click **Create HyperConverged**. 
+  8. Optional: Configure **Infra** and **Workloads** node placement options for OpenShift Virtualization components. 
+  9. Click **Create** to launch OpenShift Virtualization. 
+
+
+
+**Verification**
+
+  * Navigate to the **Workloads** **Pods** page and monitor the OpenShift Virtualization pods until they are all **Running**. After all the pods display the **Running** state, you can use OpenShift Virtualization. 
+
+
+
+## 4.3.3. Subscribe to the OpenShift Virtualization catalog by using the CLI
+
+Before you install OpenShift Virtualization, you must subscribe to the OpenShift Virtualization catalog. Subscribing gives the `openshift-cnv` namespace access to the OpenShift Virtualization Operators. 
+
+To subscribe, configure `Namespace`, `OperatorGroup`, and `Subscription` objects by applying a single manifest to your cluster. 
+
+**Prerequisites**
+
+  * You have installed OpenShift Container Platform 4.22 on your cluster. 
+  * You have installed the OpenShift CLI (`oc`). 
+  * You have logged in as a user with `cluster-admin` privileges. 
+
+
+
+**Procedure**
+
+  1. Create a YAML file that contains the following manifest: 
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openshift-cnv
+  labels:
+    openshift.io/cluster-monitoring: "true"
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: kubevirt-hyperconverged-group
+  namespace: openshift-cnv
+spec:
+  targetNamespaces:
+    - openshift-cnv
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: hco-operatorhub
+  namespace: openshift-cnv
+spec:
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  name: kubevirt-hyperconverged
+  startingCSV: kubevirt-hyperconverged-operator.v4.22.9
+  channel: "stable"
+```
+
+
+Using the `stable` channel ensures that you install the version of OpenShift Virtualization that is compatible with your OpenShift Container Platform version. 
+
+  2. Create the required `Namespace`, `OperatorGroup`, and `Subscription` objects for OpenShift Virtualization by running the following command: 
+
+```shell-session
+$ oc apply -f <filename>.yaml
+```
+
+
+**Verification**
+
+You must verify that the subscription creation was successful before you can proceed with installing OpenShift Virtualization. 
+
+  1. Check that the `ClusterServiceVersion` (CSV) object was created successfully. Run the following command and verify the output: 
+
+```shell-session
+$ oc get csv -n openshift-cnv
+```
+
+
+If the CSV was created successfully, the output shows an entry that contains a `NAME` value of `kubevirt-hyperconverged-operator-*`, a `DISPLAY` value of `OpenShift Virtualization`, and a `PHASE` value of `Succeeded`, as shown in the following example output: 
+
+Example output: 
+
+```shell-session
+NAME                                       DISPLAY                    VERSION   REPLACES                                   PHASE
+kubevirt-hyperconverged-operator.v4.22.9   OpenShift Virtualization   4.22.9    kubevirt-hyperconverged-operator.v4.21.0   Succeeded
+```
+
+
+  2. Check that the `HyperConverged` custom resource (CR) has the correct version. Run the following command and verify the output: 
+
+```shell-session
+$ oc get hyperconvergeds.v1beta1.hco.kubevirt.io -n openshift-cnv kubevirt-hyperconverged -o json | jq .status.versions
+```
+
+
+Example output: 
+
+```shell-session
+{
+"name": "operator",
+"version": "4.22.9"
+}
+```
+
+
+  3. Verify the `HyperConverged` CR conditions. Run the following command and check the output: 
+
+```shell-session
+$ oc get hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv -o json | jq -r '.status.conditions[] | {type,status}'
+```
+
+
+Example output: 
+
+```shell-session
+{
+  "type": "ReconcileComplete",
+  "status": "True"
+}
+{
+  "type": "Available",
+  "status": "True"
+}
+{
+  "type": "Progressing",
+  "status": "False"
+}
+{
+  "type": "Degraded",
+  "status": "False"
+}
+{
+  "type": "Upgradeable",
+  "status": "True"
+}
+```
+
+
+## 4.3.4. Deploy the OpenShift Virtualization Operator by using the CLI
+
+You can deploy the OpenShift Virtualization Operator by using the `oc` CLI. 
+
+**Prerequisites**
+
+  * You have installed the OpenShift CLI (`oc`). 
+  * You have logged in as a user with `cluster-admin` privileges. 
+  * You have subscribed to the OpenShift Virtualization catalog in the `openshift-cnv` namespace. 
+
+
+
+**Procedure**
+
+  1. Create a YAML file that contains the following manifest: 
+
+```yaml
+apiVersion: hco.kubevirt.io/v1beta1
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+spec:
+```
+
+
+  2. Deploy the OpenShift Virtualization Operator by running the following command: 
+
+```shell-session
+$ oc apply -f <file_name>.yaml
+```
+
+
+**Verification**
+
+  * Ensure that OpenShift Virtualization deployed successfully by watching the `PHASE` of the cluster service version (CSV) in the `openshift-cnv` namespace. Run the following command: 
+
+```shell-session
+$ watch oc get csv -n openshift-cnv
+```
+
+
+The following output displays if deployment was successful: 
+
+```shell-session
+NAME                                      DISPLAY                    VERSION   REPLACES   PHASE
+kubevirt-hyperconverged-operator.v4.22.9   OpenShift Virtualization   4.22.9                Succeeded
+```
+
+
+## 4.3.5. Additional resources
+
+  * [Installing a cluster for OpenShift Virtualization using the Agent-based Installer](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_an_on-premise_cluster_with_the_agent-based_installer/#installing-ove)
+  * [Installing with the virtualization operator bundle (Assisted Installer)](https://docs.redhat.com/en/documentation/assisted_installer_for_openshift_container_platform/2026/html/installing_openshift_container_platform_with_the_assisted_installer/customizing-with-bundles-and-operators#openshift-virtualization-operator_customizing-with-bundles-and-operators)
+  * [Using Operator Lifecycle Manager in disconnected environments](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/disconnected_environments/#olm-restricted-networks)
+  * [Configuring proxy support in Operator Lifecycle Manager](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/operators/#olm-configuring-proxy-support)
+  * [Self validation checkup](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/postinstallation-configuration#virt-self-validation-checkups "5.5. Self validation checkup")
+  * [Configure certificate rotation](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/postinstallation-configuration#virt-configuring-certificate-rotation "5.9. Configuring certificate rotation")
+  * [Creating a hostpath provisioner with a basic storage pool](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/storage#virt-creating-hpp-basic-storage-pool_virt-configuring-local-storage-with-hpp "10.6.1. Creating a hostpath provisioner with a basic storage pool")

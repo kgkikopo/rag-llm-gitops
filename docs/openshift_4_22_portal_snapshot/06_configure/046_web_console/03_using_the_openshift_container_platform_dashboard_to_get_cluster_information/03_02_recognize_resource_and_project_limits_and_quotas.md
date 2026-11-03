@@ -1,0 +1,7 @@
+# 3.2. Recognize resource and project limits and quotas
+
+You can view a graphical representation of available resources in the **Topology** view of the web console **Developer** perspective. 
+
+If a resource has a message about resource limitations or quotas being reached, a border is displayed around the resource name to indicate this. Click the resource to open a side panel to see the message. If the **Topology** view is zoomed out, a dot next to the resource name indicates that a message is available. 
+
+If you are using **List View** from the **View Shortcuts** menu, resources appear as a list. The **Alerts** column indicates if a message is available.

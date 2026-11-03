@@ -1,0 +1,490 @@
+# 11.3. Configure the PF Status Relay Operator for LACP state monitoring on SR-IOV networks
+
+Use the PF Status Relay Operator to enable Link Aggregation Control Protocol (LACP) state monitoring for workloads by using pod-level bonding with SR-IOV networks. 
+
+The Operator monitors the LACP state on physical functions (PF) and changes the link state for attached virtual functions (VF) when it detects an upstream failure. With this approach, you can detect failures on VFs attached to a PF to ensure a timely failover to a backup network path, ensuring high availability for your workloads. 
+
+The following scenario demonstrates how to configure and verify LACP state monitoring for SR-IOV networks: 
+
+  * Create host-level NIC bonds on worker nodes and configure LACP. 
+  * Define SR-IOV network policies to create virtual functions (VFs) on the bonded interfaces. 
+  * Deploy the PF Status Relay Operator to monitor physical functions and the LACP state. 
+  * Verify that pods using these VFs automatically fail over to a backup network path in case of upstream switch failure. 
+
+
+
+The following scenario demonstrates how to configure and verify LACP state monitoring for SR-IOV networks. This scenario uses SR-IOV network cards with two ports on each node, `worker-0` and `worker-1`, with both ports connected to a shared switch to support LACP bonding. 
+
+**Prerequisites**
+
+  * Nodes must have a NIC that supports SR-IOV. 
+  * The SR-IOV Network Operator is installed. 
+  * The PF Status Relay Operator is installed. 
+  * The physical switch ports connected to the worker nodes are configured for LACP with a fast polling rate. 
+  * The `linkState` is set to `auto` or `disable` for the SR-IOV VFs that you want to monitor. The Operator ignores VFs with the `linkState` set to `enable`. The default value for SR-IOV VFs is `linkState: auto`. 
+
+
+
+**Procedure**
+
+  1. Create the project namespace by creating a `namespace.yaml` file such as the following example: 
+
+**Example`namespace.yaml` file**
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    kubernetes.io/metadata.name: sriov-operator-tests
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: privileged
+    security.openshift.io/scc.podSecurityLabelSync: "false"
+  name: <namespace>
+```
+
+
+     * `<namespace>` specifies the namespace where you deploy the high-availability pod. 
+
+  2. Apply the namespace by running the following command: 
+
+```bash
+$ oc apply -f namespace.yaml
+```
+
+
+  3. Configure host-level LACP bonds: 
+
+     1. Create a YAML file that defines the `NodeNetworkConfigurationPolicy` resource for the `ens5f0` interface on the `worker-0` node: 
+
+**Example`nncpBondF0Worker0.yaml` file**
+
+```yaml
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: example-bond-f0
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: <node_name>
+  desiredState:
+    interfaces:
+      - name: example-bond-f0
+        description: example-bond-f0
+        type: bond
+        state: up
+        mtu: 9216
+        link-aggregation:
+          mode: 802.3ad
+          options:
+            miimon: '100'
+            lacp_rate: 'fast'
+            min_links: '1'
+          port:
+            - <pf_name>
+      - name: ens5f0
+        type: ethernet
+        state: up
+        mtu: 9216
+```
+
+
+        * `<node_name>` specifies the node where the bonded interface is created. 
+        * `mode: 802.3ad` sets the LACP mode to enable LACP on the bond. 
+        * `lacp_rate: 'fast'` sets the LACP rate on the interface. You must also set the rate to `fast` on the switch. The `fast` rate sends LACP packets every second. 
+        * `<pf_name>` specifies the PF that you want to include in the bond. 
+
+     2. Create a YAML file that defines the `NodeNetworkConfigurationPolicy` resource for the `ens5f1` interface on the `worker-0` node: 
+
+**Example`nncpBondF1Worker0.yaml` file**
+
+```yaml
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: example-bond-f1
+spec:
+  nodeSelector:
+    kubernetes.io/hostname: <node_name>
+  desiredState:
+    interfaces:
+      - name: example-bond-f1
+        description: example-bond-f1
+        type: bond
+        state: up
+        mtu: 9216
+        link-aggregation:
+          mode: 802.3ad
+          options:
+            miimon: '100'
+            lacp_rate: 'fast'
+            min_links: '1'
+          port:
+            - <pf_name>
+      - name: ens5f1
+        type: ethernet
+        state: up
+        mtu: 9216
+```
+
+
+        * `<node_name>` specifies the node where the bonded interface is created. 
+        * `mode: 802.3ad` sets the LACP mode to enable LACP on the bond. 
+        * `lacp_rate: 'fast'` sets the LACP rate on the interface. You must also set the rate to `fast` on the switch. The `fast` rate sends LACP packets every second. 
+        * `<pf_name>` specifies the PF that you want to include in the bond. 
+
+     3. Apply the resources by running the following commands: 
+
+```bash
+$ oc apply -f nncpBondF0Worker0.yaml
+$ oc apply -f nncpBondF1Worker0.yaml
+```
+
+
+  4. Create SR-IOV network VFs for the bonded interfaces: 
+
+     1. Create a YAML file that defines the `SriovNetworkNodePolicy` resource for the `ens5f0` interface on the `worker-0` node: 
+
+**Example`sriovnetworkpolicy-port1.yaml` file**
+
+```yaml
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: sriovnetpolicy-port-0
+  namespace: openshift-sriov-network-operator
+spec:
+  deviceType: netdevice
+  nicSelector:
+    pfNames:
+      - <pf_name>
+  nodeSelector:
+    kubernetes.io/hostname: <node_name>
+  numVfs: <num_vfs>
+  priority: 99
+  resourceName: <resource_name>
+```
+
+
+        * `<pf_name>` specifies the PF to create the VFs from. 
+        * `<node_name>` specifies the node where the VFs are created. 
+        * `<num_vfs>` specifies the number of VFs to create on the PF. 
+        * `<resource_name>` specifies the resource name used by pods to request these VFs. 
+
+     2. Create a YAML file that defines the `SriovNetworkNodePolicy` resource for the `ens5f1` interface on the `worker-0` node: 
+
+**Example`sriovnetworkpolicy-port2.yaml` file**
+
+```yaml
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: sriovnetpolicy-port-1
+  namespace: openshift-sriov-network-operator
+spec:
+  deviceType: netdevice
+  nicSelector:
+    pfNames:
+      - <pf_name>
+  nodeSelector:
+    kubernetes.io/hostname: <node_name>
+  numVfs: <num_vfs>
+  priority: 99
+  resourceName: <resource_name>
+```
+
+
+        * `<pf_name>` specifies the PF to create the VFs from. 
+        * `<node_name>` specifies the node where the VFs are created. 
+        * `<num_vfs>` specifies the number of VFs to create on the PF. 
+        * `<resource_name>` specifies the resource name used by pods to request these VFs. 
+
+     3. Apply the resources by running the following commands: 
+
+```bash
+$ oc apply -f sriovnetworkpolicy-port1.yaml
+$ oc apply -f sriovnetworkpolicy-port2.yaml
+```
+
+
+  5. Configure the PF Status Relay Operator: 
+
+     1. Create a YAML file that defines the `PFLACPMonitor` resource. This example file configures the Operator to monitor the LACP status of `ens5f0` and `ens5f1` bonded interfaces on the `worker-0` node: 
+
+**Example`pflacpmonitor.yaml` file**
+
+```yaml
+apiVersion: pfstatusrelay.openshift.io/v1alpha1
+kind: PFLACPMonitor
+metadata:
+  namespace: openshift-pf-status-relay-operator
+  labels:
+    app.kubernetes.io/name: pf-status-relay-operator
+  name: pflacpmonitor-worker-0
+spec:
+  interfaces:
+    - <pf_name>
+    - <pf_name>
+  pollingInterval: <polling_interval>
+  nodeSelector:
+    kubernetes.io/hostname: <node_name>
+```
+
+
+        * `<pf_name>` specifies the physical functions to monitor. 
+        * `<polling_interval>` specifies the polling interval in milliseconds to check the LACP status on the monitored interfaces. The minimum value is `1000`. 
+        * `<node_name>` specifies the node for the target interfaces. 
+
+Important
+
+Use only one `PFLACPMonitor` custom resource to monitor each network interface on a node. If you create multiple resources that target the same interface, the PF Status Relay Operator will not process the conflicting configurations. 
+
+     2. Apply the `PFLACPMonitor` resource by running the following command: 
+
+```bash
+$ oc apply -f pflacpmonitor.yaml
+```
+
+
+**Verification**
+
+  1. Check the logs of the PF Status Relay Operator to verify that it is monitoring the LACP state: 
+
+```bash
+$ oc logs -n openshift-pf-status-relay-operator <pf_status_relay_operator_pod_name>
+```
+
+
+**Example output**
+
+```bash
+{"time":"2025-07-24T13:35:54.653201692Z","level":"INFO","msg":"lacp is up","interface":"ens5f0"}
+{"time":"2025-07-24T13:35:54.65347273Z","level":"INFO","msg":"vf link state was set","id":0,"state":"auto","interface":"ens5f0"}
+...
+```
+
+
+  2. Apply the `SriovNetwork` resources to make the VFs available for use within the `sriov-operator-tests` namespace: 
+
+     1. Create a YAML file that defines the `SriovNetwork` resource for the VFs created on `ens5f0`: 
+
+**Example`sriovnetwork-port1.yaml` file**
+
+```yaml
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
+metadata:
+  name: sriovnetwork-port0
+  namespace: openshift-sriov-network-operator
+spec:
+  capabilities: '{ "mac": true }'
+  networkNamespace: sriov-operator-tests
+  resourceName: resourceport0
+```
+
+
+     2. Create a YAML file that defines the `SriovNetwork` resource for the VFs created on `ens5f1`: 
+
+**Example`sriovnetwork-port2.yaml` file**
+
+```yaml
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
+metadata:
+  name: sriovnetwork-port1
+  namespace: openshift-sriov-network-operator
+spec:
+  capabilities: '{ "mac": true }'
+  networkNamespace: sriov-operator-tests
+  resourceName: resourceport1
+```
+
+
+     3. Apply the resources by running the following commands: 
+
+```bash
+$ oc apply -f sriovnetwork-port1.yaml
+$ oc apply -f sriovnetwork-port2.yaml
+```
+
+
+  3. Define a high-availability pod that uses the SR-IOV VFs: 
+
+     1. Apply the `NetworkAttachmentDefinition` resource to create an `active-backup` bond using the two SR-IOV networks: 
+
+**Example`nad-bond.yaml` file**
+
+```yaml
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: nad-bond-1
+  namespace: sriov-operator-tests
+spec:
+  config: |-
+    {"type": "bond", "cniVersion": "0.3.1", "name": "bond-net1",
+    "mode": "active-backup", "failOverMac": 1, "linksInContainer": true, "miimon": "100", "mtu": 1450,
+    "links": [{"name": "net1"},{"name": "net2"}], "capabilities": {"ips": true}, "ipam": {"type": "static"}}
+```
+
+
+        * `linksInContainer: true` creates the bond inside the pod’s network namespace. 
+        * `mode: active-backup` configures the bond to use active-backup mode. 
+        * `links` specifies the pod-level interfaces to include in the bond. 
+
+Important
+
+The PF Status Relay Operator provides LACP state monitoring for pod-level bonding with the `mode: active-backup` configuration only. 
+
+     2. Apply the `NetworkAttachmentDefinition` resource by running the following command: 
+
+```bash
+$ oc apply -f nad-bond.yaml
+```
+
+
+     3. Create a YAML file that defines the `Pod` resource that uses the VFs from the bonded interfaces in active-backup mode: 
+
+**Example`client-bond.yaml` file**
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: client-bond
+  namespace: sriov-operator-tests
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |-
+      [{
+          "name": "sriovnetwork-port0",
+          "interface": "net1",
+          "mac": "<mac_address>"
+        },{
+          "name": "sriovnetwork-port1",
+          "interface": "net2",
+          "mac": "<mac_address>"
+        },{
+          "name": "nad-bond-1",
+          "interface": "bond0",
+          "ips": ["192.168.10.254/24","2001:100::254/64"],
+          "mac": "<mac_address>"
+      }]
+spec:
+  nodeName: worker-0
+  containers:
+    - name: client-bond
+      image: quay.io/nginx/nginx-unprivileged
+      imagePullPolicy: IfNotPresent
+      command: ["/bin/sh", "-c", "sleep 3650d"]
+      securityContext:
+        privileged: true
+      command: ["/bin/sleep", "3650d"]
+```
+
+
+        * The `k8s.v1.cni.cncf.io/networks` annotation requests three networks: two SR-IOV VFs, `net1` and `net2`, and one bond, `bond0`, which uses them. 
+
+     4. Apply the `Pod` resource by running the following command: 
+
+```bash
+$ oc apply -f client-bond.yaml
+```
+
+
+  4. Check that the failover mechanism: 
+
+     1. Log in to the `client-bond` pod by running the following command: 
+
+```bash
+$ oc rsh -n sriov-operator-tests client-bond
+```
+
+
+     2. Check the initial status of the pod-level bond by running the following command: 
+
+```bash
+sh-4.4# cat /proc/net/bonding/bond0
+```
+
+
+**Example output**
+
+```bash
+[root@client-bond-tlb /]# cat /proc/net/bonding/bond0
+...
+
+Bonding Mode: transmit load balancing
+Transmit Hash Policy: layer2 (0)
+Primary Slave: None
+Currently Active Slave: net1
+MII Status: up
+MII Polling Interval (ms): 100
+Up Delay (ms): 0
+Down Delay (ms): 0
+Peer Notification Delay (ms): 0
+
+Slave Interface: net1
+MII Status: up
+Speed: 25000 Mbps
+Duplex: full
+Link Failure Count: 0
+Permanent HW addr: AA:BB:CC:DD:EE:FF
+Slave queue ID: 0
+
+Slave Interface: net2
+MII Status: up
+Speed: 25000 Mbps
+Duplex: full
+Link Failure Count: 0
+Permanent HW addr: BB:CC:DD:EE:FF:GG
+```
+
+
+        * Both `net1` and `net2` interfaces are up. 
+
+     3. Exit the pod shell. 
+     4. Simulate an LACP failure on your upstream physical switch. To simulate this scenario, you can filter LACP traffic on the switch port that you want to test the failure on. This ensures that the physical link remains up while the LACP polling fails. The command to do this is vendor-dependent. 
+     5. Verify the failover inside the pod by logging back into the `client-bond` pod and checking the bond status again: 
+
+```bash
+sh-4.4# cat /proc/net/bonding/bond0
+```
+
+
+**Example output**
+
+```bash
+...
+
+Bonding Mode: transmit load balancing
+Transmit Hash Policy: layer2 (0)
+Primary Slave: None
+Currently Active Slave: net2
+MII Status: up
+MII Polling Interval (ms): 100
+Up Delay (ms): 0
+Down Delay (ms): 0
+Peer Notification Delay (ms): 0
+
+Slave Interface: net1
+MII Status: down
+Speed: Unknown
+Duplex: Unknown
+Link Failure Count: 1
+Permanent HW addr: AA:BB:CC:DD:EE:FF
+Slave queue ID: 0
+
+Slave Interface: net2
+MII Status: up
+Speed: 25000 Mbps
+Duplex: full
+Link Failure Count: 0
+Permanent HW addr: BB:CC:DD:EE:FF:GG
+Slave queue ID: 0
+```
+
+
+        * The `net1` interface is down, and the `net2` interface is now the active interface. 
+
+The client-bond pod detects the link state change and switches to the backup network path.

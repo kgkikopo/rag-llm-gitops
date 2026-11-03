@@ -1,0 +1,13 @@
+# 1.4. About containerized applications for developers
+
+As a developer, you can improve your development workflow by choosing the right tools, templates, and Operator-based methods to build containerized applications in OpenShift Container Platform. 
+
+Depending on your unique requirements, you can choose from the following approaches: 
+
+  * Use various build-tool, base-image, and registry options to build a simple container application. 
+  * Use supporting components such as the software catalog and templates to develop your application. 
+  * Package and deploy your application as an Operator. 
+
+
+
+You can also create a Kubernetes manifest and store it in a Git repository. Kubernetes works on basic units called pods. A pod is a single instance of a running process in your cluster. Pods can contain one or more containers. You can create a service by grouping a set of pods and their access policies. Services provide permanent internal IP addresses and host names for other applications to use as pods are created and destroyed. Kubernetes defines workloads based on the type of your application.

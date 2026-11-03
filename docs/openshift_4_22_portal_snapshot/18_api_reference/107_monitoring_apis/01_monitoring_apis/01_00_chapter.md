@@ -1,0 +1,15 @@
+# Chapter 1. Monitoring APIs
+
+- [1.1. Alertmanager [monitoring.coreos.com/v1]](01_01_alertmanager_monitoring_coreos_com_v1.md)
+- [1.2. AlertmanagerConfig [monitoring.coreos.com/v1beta1]](01_02_alertmanagerconfig_monitoring_coreos_com_v1beta1.md)
+- [1.3. AlertRelabelConfig [monitoring.openshift.io/v1]](01_03_alertrelabelconfig_monitoring_openshift_io_v1.md)
+- [1.4. AlertingRule [monitoring.openshift.io/v1]](01_04_alertingrule_monitoring_openshift_io_v1.md)
+- [1.5. DataGather [insights.openshift.io/v1]](01_05_datagather_insights_openshift_io_v1.md)
+- [1.6. PodMonitor [monitoring.coreos.com/v1]](01_06_podmonitor_monitoring_coreos_com_v1.md)
+- [1.7. Probe [monitoring.coreos.com/v1]](01_07_probe_monitoring_coreos_com_v1.md)
+- [1.8. Prometheus [monitoring.coreos.com/v1]](01_08_prometheus_monitoring_coreos_com_v1.md)
+- [1.9. PrometheusRule [monitoring.coreos.com/v1]](01_09_prometheusrule_monitoring_coreos_com_v1.md)
+- [1.10. ServiceMonitor [monitoring.coreos.com/v1]](01_10_servicemonitor_monitoring_coreos_com_v1.md)
+- [1.11. ThanosRuler [monitoring.coreos.com/v1]](01_11_thanosruler_monitoring_coreos_com_v1.md)
+- [1.12. NodeMetrics [metrics.k8s.io/v1beta1]](01_12_nodemetrics_metrics_k8s_io_v1beta1.md)
+- [1.13. PodMetrics [metrics.k8s.io/v1beta1]](01_13_podmetrics_metrics_k8s_io_v1beta1.md)

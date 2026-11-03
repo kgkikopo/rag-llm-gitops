@@ -1,0 +1,18 @@
+# Chapter 6. Working with nodes
+
+- [6.1. Viewing and listing the nodes in your OpenShift Container Platform cluster](06_01_viewing_and_listing_the_nodes_in_your_openshift_container_platform_cluster.md)
+- [6.2. Working with nodes](06_02_working_with_nodes.md)
+- [6.3. Managing nodes](06_03_managing_nodes.md)
+- [6.4. Adding worker nodes to an on-premise cluster](06_04_adding_worker_nodes_to_an_on_premise_cluster.md)
+- [6.5. Managing the maximum number of pods per node](06_05_managing_the_maximum_number_of_pods_per_node.md)
+- [6.6. Replacing a failed bare-metal control plane node without BMC credentials](06_06_replacing_a_failed_bare_metal_control_plane_node_without_bmc_credentials.md)
+- [6.7. Using the Node Tuning Operator](06_07_using_the_node_tuning_operator.md)
+- [6.8. Remediating, fencing, and maintaining nodes](06_08_remediating_fencing_and_maintaining_nodes.md)
+- [6.9. Understanding node rebooting](06_09_understanding_node_rebooting.md)
+- [6.10. Boot image management](06_10_boot_image_management.md)
+- [6.11. Freeing node resources using garbage collection](06_11_freeing_node_resources_using_garbage_collection.md)
+- [6.12. Allocating resources for nodes in an OpenShift Container Platform cluster](06_12_allocating_resources_for_nodes_in_an_openshift_container_platform_cluster.md)
+- [6.13. Allocating specific CPUs for nodes in a cluster](06_13_allocating_specific_cpus_for_nodes_in_a_cluster.md)
+- [6.14. Additional CRI-O storage locations for faster container startup](06_14_additional_cri_o_storage_locations_for_faster_container_startup.md)
+- [6.15. Enabling TLS security profiles for the kubelet](06_15_enabling_tls_security_profiles_for_the_kubelet.md)
+- [6.16. Creating infrastructure nodes](06_16_creating_infrastructure_nodes.md)

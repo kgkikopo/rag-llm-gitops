@@ -1,0 +1,86 @@
+# 6.5. Export enriched network flow data
+
+Configure the `FlowCollector` resource to export enriched network flow data simultaneously to Kafka, IPFIX, or an OpenTelemetry endpoint for external consumption by tools like Splunk or Prometheus. 
+
+For Kafka or IPFIX, any processor or storage that supports those inputs, such as Splunk, Elasticsearch, or Fluentd, can consume the enriched network flow data. 
+
+For OpenTelemetry, network flow data and metrics can be exported to a compatible OpenTelemetry endpoint, such as Red Hat build of OpenTelemetry or Prometheus. 
+
+After configuration, network flows data can be sent to an available output. For more information, see "Network flows format reference". 
+
+**Prerequisites**
+
+  * Your Kafka, IPFIX, or OpenTelemetry collector endpoints are available from Network Observability `flowlogs-pipeline` pods. 
+
+
+
+**Procedure**
+
+  1. In the web console, navigate to **Ecosystem** **Installed Operators**. 
+  2. Under the **Provided APIs** heading for the **NetObserv Operator** , select **Flow Collector**. 
+  3. Select **cluster** and then select the **YAML** tab. 
+  4. Edit the `FlowCollector` to configure `spec.exporters` as follows: 
+
+```yaml
+apiVersion: flows.netobserv.io/v1beta2
+kind: FlowCollector
+metadata:
+  name: cluster
+spec:
+  exporters:
+  - type: Kafka
+      kafka:
+        address: "kafka-cluster-kafka-bootstrap.netobserv"
+        topic: netobserv-flows-export
+        tls:
+          enable: false
+  - type: IPFIX
+      ipfix:
+        targetHost: "ipfix-collector.ipfix.svc.cluster.local"
+        targetPort: 4739
+        transport: tcp
+ -  type: OpenTelemetry
+      openTelemetry:
+        targetHost: my-otelcol-collector-headless.otlp.svc
+        targetPort: 4317
+        type: grpc
+        logs:
+          enable: true
+        metrics:
+          enable: true
+          prefix: netobserv
+          pushTimeInterval: 20s
+          expiryTime: 2m
+   #    fieldsMapping:
+   #      input: SrcAddr
+   #      output: source.address
+```
+
+
+where: 
+
+`spec.exporters.type`
+     Specifies the export type. You can export flows to `IPFIX`, `OpenTelemetry`, and `Kafka` individually or concurrently. 
+`spec.exporters.kafka.topic`
+     Specifies the Kafka topic where the Network Observability Operator exports all flows. 
+`spec.exporters.kafka.tls.enable`
+     Specifies whether to encrypt communications to and from Kafka with SSL/TLS or mTLS. When enabled, the Kafka CA certificate must be available as a `ConfigMap` or a `Secret` in the namespace where the `flowlogs-pipeline` processor component is deployed (default: `netobserv`). Reference the certificate with `spec.exporters.tls.caCert`. For mTLS, client secrets must also be available in these namespaces and referenced with `spec.exporters.tls.userCert`. 
+`spec.exporters.ipfix.transport`
+     Specifies the transport protocol. The default value is `tcp`, but you can also specify `udp`. 
+`spec.exporters.openTelemetry.type`
+     Specifies the OpenTelemetry connection protocol. The available options are `http` and `grpc`. 
+`spec.exporters.openTelemetry.logs`
+     Specifies the OpenTelemetry configuration for exporting logs, which are identical to the logs created for Loki. 
+`spec.exporters.openTelemetry.metrics`
+     Specifies the OpenTelemetry configuration for exporting metrics, which are identical to the metrics created for Prometheus. These are defined in the `spec.processor.metrics.includeList` parameter of the `FlowCollector` resource or via the `FlowMetrics` resource. 
+`spec.exporters.openTelemetry.metrics.pushTimeInterval`
+     Specifies the time interval for sending metrics to the OpenTelemetry collector. 
+`spec.exporters.openTelemetry.fieldsMapping`
+     Specifies an optional mapping to customize the OpenTelemetry format output. Network Observability flow formats are automatically renamed to an OpenTelemetry-compliant format, but this parameter allows for custom overrides. For example in the YAML sample, `SrcAddr` is the Network Observability input field, and it is being renamed to `source.address` in OpenTelemetry output. You can see both Network Observability and OpenTelemetry formats in the "Network flows format reference". 
+
+
+
+
+**Additional resources**
+
+  * [Network flows format reference](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/network_observability/network-observability-api-reference#network-flows-format_network_observability "19.1.4. Network flows format")

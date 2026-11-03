@@ -1,5 +1,6 @@
 import os
 import json
+from html import escape
 import logging
 import urllib.parse
 import yaml
@@ -201,17 +202,22 @@ def retrieve_docs(query: str, top_k: int = 4):
                 docs = []
                 for doc_text, metadata, dist in rows:
                     source = "Unknown"
-                    if isinstance(metadata, dict):
-                        source = metadata.get("source", metadata.get("title", "OpenShift 4.22 Docs"))
-                    elif isinstance(metadata, str):
+                    if isinstance(metadata, str):
                         try:
-                            m_dict = json.loads(metadata)
-                            source = m_dict.get("source", m_dict.get("title", "OpenShift 4.22 Docs"))
-                        except Exception:
-                            source = metadata
+                            metadata = json.loads(metadata)
+                        except ValueError:
+                            source, metadata = metadata, {}
+                    if not isinstance(metadata, dict):
+                        metadata = {}
+                    source = metadata.get("source", metadata.get("title", source))
                     docs.append({
                         "content": doc_text,
                         "source": source,
+                        "source_url": metadata.get("source_url"),
+                        "heading_path": metadata.get("heading_path"),
+                        "path": metadata.get("path"),
+                        "version": metadata.get("version"),
+                        "section_number": metadata.get("section_number"),
                         "distance": float(dist)
                     })
                 return docs, None
@@ -618,26 +624,26 @@ def chat_respond(user_message: str, chat_history: list):
             content = doc.get("content", "")
             dist = doc.get("distance", 0.0)
             score = max(0.0, 1.0 - dist)
-            title = get_doc_title(src, content)
-            url = get_live_doc_url(src)
-            sources_map[title] = url
+            title = doc.get("heading_path") or get_doc_title(src, content)
+            url = doc.get("source_url") or get_live_doc_url(src)
+            sources_map[url] = title
 
             escaped_content = (
                 content.replace("&", "&amp;")
                        .replace("<", "&lt;")
                        .replace(">", "&gt;")
             )
-            clean_src_path = src.split("@")[-1]
+            clean_src_path = doc.get("path") or src.split("@")[-1]
             border_style = 'border-top: 1px solid #e2e8f0; padding-top: 12px;' if idx > 1 else ''
 
             snippets_html.append(
                 f'<div style="margin-top: 12px; {border_style}">'
                 f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">'
-                f'<a href="{url}" target="_blank" rel="noopener noreferrer" style="font-weight: 600; color: #0284c7; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">'
-                f'{title} <span style="font-size: 10px; opacity: 0.7;">&#x2197;</span></a>'
+                f'<a href="{escape(url)}" target="_blank" rel="noopener noreferrer" style="font-weight: 600; color: #0284c7; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">'
+                f'{escape(title)} <span style="font-size: 10px; opacity: 0.7;">&#x2197;</span></a>'
                 f'<span style="font-size: 11px; font-family: monospace; color: #64748b; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">{score*100:.0f}% relevance</span>'
                 f'</div>'
-                f'<div style="font-size: 10px; font-family: monospace; color: #94a3b8; margin-bottom: 6px;">{clean_src_path}</div>'
+                f'<div style="font-size: 10px; font-family: monospace; color: #94a3b8; margin-bottom: 6px;">{escape(clean_src_path)}</div>'
                 f'<pre style="font-size: 11px; font-family: monospace; color: #334155; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; white-space: pre-wrap; word-break: break-word; line-height: 1.5; margin: 0;">{escaped_content}</pre>'
                 f'</div>'
             )
@@ -673,8 +679,8 @@ def chat_respond(user_message: str, chat_history: list):
 
         # Append source references with live links at the end
         sources_links = [
-            f'• <a href="{url}" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: underline;">{title}</a>'
-            for title, url in sorted(sources_map.items())
+            f'• <a href="{escape(url)}" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: underline;">{escape(title)}</a>'
+            for url, title in sorted(sources_map.items(), key=lambda item: item[1])
         ]
         sources_section = "<br>".join(sources_links)
         final_answer = f"{full_response}\n\n---\n**Official OpenShift 4.22 Documentation Sources:**\n\n{sources_section}"
@@ -732,10 +738,10 @@ def compare_query(query: str):
         for idx, doc in enumerate(docs, 1):
             src = doc.get("source", "Unknown")
             cnt = doc.get("content", "")
-            title = get_doc_title(src, cnt)
-            url = get_live_doc_url(src)
-            sources_map[title] = url
-            clean_path = src.split("@")[-1]
+            title = doc.get("heading_path") or get_doc_title(src, cnt)
+            url = doc.get("source_url") or get_live_doc_url(src)
+            sources_map[url] = title
+            clean_path = doc.get("path") or src.split("@")[-1]
             context_blocks.append(f"[{idx}] {title} ({clean_path}):\n{cnt}")
 
         context_str = "\n\n".join(context_blocks)
@@ -753,8 +759,8 @@ def compare_query(query: str):
         ]
         rag_body = call_llm(rag_messages)
         sources_links = [
-            f'• <a href="{url}" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: underline;">{title}</a>'
-            for title, url in sorted(sources_map.items())
+            f'• <a href="{escape(url)}" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: underline;">{escape(title)}</a>'
+            for url, title in sorted(sources_map.items(), key=lambda item: item[1])
         ]
         rag_output = f"{rag_body}\n\n---\n**Official OpenShift 4.22 Documentation Sources:**\n\n" + "<br>".join(sources_links)
     else:

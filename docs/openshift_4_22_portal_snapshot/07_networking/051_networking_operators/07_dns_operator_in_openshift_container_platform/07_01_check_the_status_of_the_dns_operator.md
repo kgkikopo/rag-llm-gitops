@@ -1,0 +1,39 @@
+# 7.1. Check the status of the DNS Operator
+
+You can check the DNS Operator deployment and cluster operator status. The DNS Operator is deployed during installation with a `Deployment` object. 
+
+The DNS Operator implements the `dns` API from the `operator.openshift.io` API group. The Operator deploys CoreDNS using a daemon set, creates a service for the daemon set, and configures the kubelet to instruct pods to use the CoreDNS service IP address for name resolution. 
+
+**Procedure**
+
+  1. Use the `oc get` command to view the deployment status: 
+
+```shell-session
+$ oc get -n openshift-dns-operator deployment/dns-operator
+```
+
+
+**Example output**
+
+```shell-session
+NAME           READY     UP-TO-DATE   AVAILABLE   AGE
+dns-operator   1/1       1            1           23h
+```
+
+
+  2. Use the `oc get` command to view the state of the DNS Operator: 
+
+```shell-session
+$ oc get clusteroperator/dns
+```
+
+
+**Example output**
+
+```shell-session
+NAME      VERSION     AVAILABLE   PROGRESSING   DEGRADED   SINCE   MESSAGE
+dns       4.1.15-0.11  True        False         False      92m
+```
+
+
+`AVAILABLE`, `PROGRESSING`, and `DEGRADED` provide information about the status of the Operator. `AVAILABLE` is `True` when at least 1 pod from the CoreDNS daemon set reports an `Available` status condition, and the DNS service has a cluster IP address.

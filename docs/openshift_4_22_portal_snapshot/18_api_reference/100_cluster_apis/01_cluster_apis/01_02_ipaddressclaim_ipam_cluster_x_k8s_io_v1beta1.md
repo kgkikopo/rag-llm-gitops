@@ -1,0 +1,6 @@
+# 1.2. IPAddressClaim [ipam.cluster.x-k8s.io/v1beta1]
+
+Description
+     IPAddressClaim is the Schema for the ipaddressclaim API. 
+Type
+     `object`

@@ -1,0 +1,1006 @@
+# 2.1. Specification
+
+Property| Type| Description  
+---|---|---  
+`apiVersion` |  `string` |  APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources>  
+`kind` |  `string` |  Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds>  
+`metadata` |  [`ObjectMeta`](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/common_object_reference/#io-k8s-apimachinery-pkg-apis-meta-v1-ObjectMeta) |  Standard object’s metadata. More info: <https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata>  
+`spec` |  `object` |   
+`status` |  `object` |   
+Show more
+
+## 2.1.1. .spec
+
+Description
+    
+Type
+     `object`
+Required
+    
+
+  * `sourceType`
+
+
+
+Property| Type| Description  
+---|---|---  
+`address` |  `string` |  Address is a host that OLM can use to connect to a pre-existing registry. Format: <registry-host or ip>:<port> Only used when SourceType = SourceTypeGrpc. Ignored when the Image field is set.   
+`configMap` |  `string` |  ConfigMap is the name of the ConfigMap to be used to back a configmap-server registry. Only used when SourceType = SourceTypeConfigmap or SourceTypeInternal.   
+`description` |  `string` |   
+`displayName` |  `string` |  Metadata   
+`grpcPodConfig` |  `object` |  GrpcPodConfig exposes different overrides for the pod spec of the CatalogSource Pod. Only used when SourceType = SourceTypeGrpc and Image is set.   
+`icon` |  `object` |   
+`image` |  `string` |  Image is an operator-registry container image to instantiate a registry-server with. Only used when SourceType = SourceTypeGrpc. If present, the address field is ignored.   
+`priority` |  `integer` |  Priority field assigns a weight to the catalog source to prioritize them so that it can be consumed by the dependency resolver. Usage: Higher weight indicates that this catalog source is preferred over lower weighted catalog sources during dependency resolution. The range of the priority value can go from positive to negative in the range of int32. The default value to a catalog source with unassigned priority would be 0. The catalog source with the same priority values will be ranked lexicographically based on its name.   
+`publisher` |  `string` |   
+`runAsRoot` |  `boolean` |  RunAsRoot allows admins to indicate that they wish to run the CatalogSource pod in a privileged pod as root. This should only be enabled when running older catalog images which could not be run as non-root.   
+`secrets` |  `array (string)` |  Secrets represent set of secrets that can be used to access the contents of the catalog. It is best to keep this list small, since each will need to be tried for every catalog entry.   
+`sourceType` |  `string` |  SourceType is the type of source   
+`updateStrategy` |  `object` |  UpdateStrategy defines how updated catalog source images can be discovered Consists of an interval that defines polling duration and an embedded strategy type   
+Show more
+
+## 2.1.2. .spec.grpcPodConfig
+
+Description
+     GrpcPodConfig exposes different overrides for the pod spec of the CatalogSource Pod. Only used when SourceType = SourceTypeGrpc and Image is set. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`affinity` |  `object` |  Affinity is the catalog source’s pod’s affinity.   
+`extractContent` |  `object` |  ExtractContent configures the gRPC catalog Pod to extract catalog metadata from the provided index image and use a well-known version of the `opm` server to expose it. The catalog index image that this CatalogSource is configured to use **must** be using the file-based catalogs in order to utilize this feature.   
+`memoryTarget` |  `integer-or-string` |  MemoryTarget configures the $GOMEMLIMIT value for the gRPC catalog Pod. This is a soft memory limit for the server, which the runtime will attempt to meet but makes no guarantees that it will do so. If this value is set, the Pod will have the following modifications made to the container running the server: - the $GOMEMLIMIT environment variable will be set to this value in bytes - the memory request will be set to this value  This field should be set if it’s desired to reduce the footprint of a catalog server as much as possible, or if a catalog being served is very large and needs more than the default allocation. If your index image has a file- system cache, determine a good approximation for this value by doubling the size of the package cache at /tmp/cache/cache/packages.json in the index image.  This field is best-effort; if unset, no default will be used and no Pod memory limit or $GOMEMLIMIT value will be set.   
+`nodeSelector` |  `object (string)` |  NodeSelector is a selector which must be true for the pod to fit on a node. Selector which must match a node’s labels for the pod to be scheduled on that node.   
+`priorityClassName` |  `string` |  If specified, indicates the pod’s priority. If not specified, the pod priority will be default or zero if there is no default.   
+`securityContextConfig` |  `string` |  SecurityContextConfig can be one of `legacy` or `restricted`. The CatalogSource’s pod is either injected with the right pod.spec.securityContext and pod.spec.container[*].securityContext values to allow the pod to run in Pod Security Admission (PSA) `restricted` mode, or doesn’t set these values at all, in which case the pod can only be run in PSA `baseline` or `privileged` namespaces. If the SecurityContextConfig is unspecified, the mode will be determined by the namespace’s PSA configuration. If the namespace is enforcing `restricted` mode, then the pod will be configured as if `restricted` was specified. Otherwise, it will be configured as if `legacy` was specified. Specifying a value other than `legacy` or `restricted` result in a validation error. When using older catalog images, which can not run in `restricted` mode, the SecurityContextConfig should be set to `legacy`.  More information about PSA can be found here: <https://kubernetes.io/docs/concepts/security/pod-security-admission/>  
+`tolerations` |  `array` |  Tolerations are the catalog source’s pod’s tolerations.   
+`tolerations[]` |  `object` |  The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.   
+Show more
+
+## 2.1.3. .spec.grpcPodConfig.affinity
+
+Description
+     Affinity is the catalog source’s pod’s affinity. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`nodeAffinity` |  `object` |  Describes node affinity scheduling rules for the pod.   
+`podAffinity` |  `object` |  Describes pod affinity scheduling rules (e.g. co-locate this pod in the same node, zone, etc. as some other pod(s)).   
+`podAntiAffinity` |  `object` |  Describes pod anti-affinity scheduling rules (e.g. avoid putting this pod in the same node, zone, etc. as some other pod(s)).   
+Show more
+
+## 2.1.4. .spec.grpcPodConfig.affinity.nodeAffinity
+
+Description
+     Describes node affinity scheduling rules for the pod. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`preferredDuringSchedulingIgnoredDuringExecution` |  `array` |  The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding "weight" to the sum if the node matches the corresponding matchExpressions; the node(s) with the highest sum are the most preferred.   
+`preferredDuringSchedulingIgnoredDuringExecution[]` |  `object` |  An empty preferred scheduling term matches all objects with implicit weight 0 (i.e. it’s a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).   
+`requiredDuringSchedulingIgnoredDuringExecution` |  `object` |  If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to an update), the system may or may not try to eventually evict the pod from its node.   
+Show more
+
+## 2.1.5. .spec.grpcPodConfig.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution
+
+Description
+     The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding "weight" to the sum if the node matches the corresponding matchExpressions; the node(s) with the highest sum are the most preferred. 
+Type
+     `array`
+
+## 2.1.6. .spec.grpcPodConfig.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[]
+
+Description
+     An empty preferred scheduling term matches all objects with implicit weight 0 (i.e. it’s a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op). 
+Type
+     `object`
+Required
+    
+
+  * `preference`
+  * `weight`
+
+
+
+Property| Type| Description  
+---|---|---  
+`preference` |  `object` |  A node selector term, associated with the corresponding weight.   
+`weight` |  `integer` |  Weight associated with matching the corresponding nodeSelectorTerm, in the range 1-100.   
+Show more
+
+## 2.1.7. .spec.grpcPodConfig.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[].preference
+
+Description
+     A node selector term, associated with the corresponding weight. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`matchExpressions` |  `array` |  A list of node selector requirements by node’s labels.   
+`matchExpressions[]` |  `object` |  A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.   
+`matchFields` |  `array` |  A list of node selector requirements by node’s fields.   
+`matchFields[]` |  `object` |  A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.   
+Show more
+
+## 2.1.8. .spec.grpcPodConfig.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[].preference.matchExpressions
+
+Description
+     A list of node selector requirements by node’s labels. 
+Type
+     `array`
+
+## 2.1.9. .spec.grpcPodConfig.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[].preference.matchExpressions[]
+
+Description
+     A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values. 
+Type
+     `object`
+Required
+    
+
+  * `key`
+  * `operator`
+
+
+
+Property| Type| Description  
+---|---|---  
+`key` |  `string` |  The label key that the selector applies to.   
+`operator` |  `string` |  Represents a key’s relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.   
+`values` |  `array (string)` |  An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.   
+Show more
+
+## 2.1.10. .spec.grpcPodConfig.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[].preference.matchFields
+
+Description
+     A list of node selector requirements by node’s fields. 
+Type
+     `array`
+
+## 2.1.11. .spec.grpcPodConfig.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution[].preference.matchFields[]
+
+Description
+     A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values. 
+Type
+     `object`
+Required
+    
+
+  * `key`
+  * `operator`
+
+
+
+Property| Type| Description  
+---|---|---  
+`key` |  `string` |  The label key that the selector applies to.   
+`operator` |  `string` |  Represents a key’s relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.   
+`values` |  `array (string)` |  An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.   
+Show more
+
+## 2.1.12. .spec.grpcPodConfig.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution
+
+Description
+     If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to an update), the system may or may not try to eventually evict the pod from its node. 
+Type
+     `object`
+Required
+    
+
+  * `nodeSelectorTerms`
+
+
+
+Property| Type| Description  
+---|---|---  
+`nodeSelectorTerms` |  `array` |  Required. A list of node selector terms. The terms are ORed.   
+`nodeSelectorTerms[]` |  `object` |  A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.   
+Show more
+
+## 2.1.13. .spec.grpcPodConfig.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms
+
+Description
+     Required. A list of node selector terms. The terms are ORed. 
+Type
+     `array`
+
+## 2.1.14. .spec.grpcPodConfig.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[]
+
+Description
+     A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`matchExpressions` |  `array` |  A list of node selector requirements by node’s labels.   
+`matchExpressions[]` |  `object` |  A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.   
+`matchFields` |  `array` |  A list of node selector requirements by node’s fields.   
+`matchFields[]` |  `object` |  A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.   
+Show more
+
+## 2.1.15. .spec.grpcPodConfig.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[].matchExpressions
+
+Description
+     A list of node selector requirements by node’s labels. 
+Type
+     `array`
+
+## 2.1.16. .spec.grpcPodConfig.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[].matchExpressions[]
+
+Description
+     A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values. 
+Type
+     `object`
+Required
+    
+
+  * `key`
+  * `operator`
+
+
+
+Property| Type| Description  
+---|---|---  
+`key` |  `string` |  The label key that the selector applies to.   
+`operator` |  `string` |  Represents a key’s relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.   
+`values` |  `array (string)` |  An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.   
+Show more
+
+## 2.1.17. .spec.grpcPodConfig.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[].matchFields
+
+Description
+     A list of node selector requirements by node’s fields. 
+Type
+     `array`
+
+## 2.1.18. .spec.grpcPodConfig.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[].matchFields[]
+
+Description
+     A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values. 
+Type
+     `object`
+Required
+    
+
+  * `key`
+  * `operator`
+
+
+
+Property| Type| Description  
+---|---|---  
+`key` |  `string` |  The label key that the selector applies to.   
+`operator` |  `string` |  Represents a key’s relationship to a set of values. Valid operators are In, NotIn, Exists, DoesNotExist. Gt, and Lt.   
+`values` |  `array (string)` |  An array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. If the operator is Gt or Lt, the values array must have a single element, which will be interpreted as an integer. This array is replaced during a strategic merge patch.   
+Show more
+
+## 2.1.19. .spec.grpcPodConfig.affinity.podAffinity
+
+Description
+     Describes pod affinity scheduling rules (e.g. co-locate this pod in the same node, zone, etc. as some other pod(s)). 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`preferredDuringSchedulingIgnoredDuringExecution` |  `array` |  The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.   
+`preferredDuringSchedulingIgnoredDuringExecution[]` |  `object` |  The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)   
+`requiredDuringSchedulingIgnoredDuringExecution` |  `array` |  If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.   
+`requiredDuringSchedulingIgnoredDuringExecution[]` |  `object` |  Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key <topologyKey> matches that of any node on which a pod of the set of pods is running   
+Show more
+
+## 2.1.20. .spec.grpcPodConfig.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution
+
+Description
+     The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred. 
+Type
+     `array`
+
+## 2.1.21. .spec.grpcPodConfig.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[]
+
+Description
+     The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s) 
+Type
+     `object`
+Required
+    
+
+  * `podAffinityTerm`
+  * `weight`
+
+
+
+Property| Type| Description  
+---|---|---  
+`podAffinityTerm` |  `object` |  Required. A pod affinity term, associated with the corresponding weight.   
+`weight` |  `integer` |  weight associated with matching the corresponding podAffinityTerm, in the range 1-100.   
+Show more
+
+## 2.1.22. .spec.grpcPodConfig.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm
+
+Description
+     Required. A pod affinity term, associated with the corresponding weight. 
+Type
+     `object`
+Required
+    
+
+  * `topologyKey`
+
+
+
+Property| Type| Description  
+---|---|---  
+`labelSelector` |  `object` |  A label query over a set of resources, in this case pods. If it’s null, this PodAffinityTerm matches with no Pods.   
+`matchLabelKeys` |  `array (string)` |  MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod’s pod (anti) affinity. Keys that don’t exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn’t set.   
+`mismatchLabelKeys` |  `array (string)` |  MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod’s pod (anti) affinity. Keys that don’t exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn’t set.   
+`namespaceSelector` |  `object` |  A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means "this pod’s namespace". An empty selector ({}) matches all namespaces.   
+`namespaces` |  `array (string)` |  namespaces specifies a static list of namespace names that the term applies to. The term is applied to the union of the namespaces listed in this field and the ones selected by namespaceSelector. null or empty namespaces list and null namespaceSelector means "this pod’s namespace".   
+`topologyKey` |  `string` |  This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching the labelSelector in the specified namespaces, where co-located is defined as running on a node whose value of the label with key topologyKey matches that of any node on which any of the selected pods is running. Empty topologyKey is not allowed.   
+Show more
+
+## 2.1.23. .spec.grpcPodConfig.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm.labelSelector
+
+Description
+     A label query over a set of resources, in this case pods. If it’s null, this PodAffinityTerm matches with no Pods. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`matchExpressions` |  `array` |  matchExpressions is a list of label selector requirements. The requirements are ANDed.   
+`matchExpressions[]` |  `object` |  A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.   
+`matchLabels` |  `object (string)` |  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.   
+Show more
+
+## 2.1.24. .spec.grpcPodConfig.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm.labelSelector.matchExpressions
+
+Description
+     matchExpressions is a list of label selector requirements. The requirements are ANDed. 
+Type
+     `array`
+
+## 2.1.25. .spec.grpcPodConfig.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm.labelSelector.matchExpressions[]
+
+Description
+     A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values. 
+Type
+     `object`
+Required
+    
+
+  * `key`
+  * `operator`
+
+
+
+Property| Type| Description  
+---|---|---  
+`key` |  `string` |  key is the label key that the selector applies to.   
+`operator` |  `string` |  operator represents a key’s relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.   
+`values` |  `array (string)` |  values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.   
+Show more
+
+## 2.1.26. .spec.grpcPodConfig.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm.namespaceSelector
+
+Description
+     A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means "this pod’s namespace". An empty selector ({}) matches all namespaces. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`matchExpressions` |  `array` |  matchExpressions is a list of label selector requirements. The requirements are ANDed.   
+`matchExpressions[]` |  `object` |  A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.   
+`matchLabels` |  `object (string)` |  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.   
+Show more
+
+## 2.1.27. .spec.grpcPodConfig.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm.namespaceSelector.matchExpressions
+
+Description
+     matchExpressions is a list of label selector requirements. The requirements are ANDed. 
+Type
+     `array`
+
+## 2.1.28. .spec.grpcPodConfig.affinity.podAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm.namespaceSelector.matchExpressions[]
+
+Description
+     A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values. 
+Type
+     `object`
+Required
+    
+
+  * `key`
+  * `operator`
+
+
+
+Property| Type| Description  
+---|---|---  
+`key` |  `string` |  key is the label key that the selector applies to.   
+`operator` |  `string` |  operator represents a key’s relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.   
+`values` |  `array (string)` |  values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.   
+Show more
+
+## 2.1.29. .spec.grpcPodConfig.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution
+
+Description
+     If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. 
+Type
+     `array`
+
+## 2.1.30. .spec.grpcPodConfig.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution[]
+
+Description
+     Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key <topologyKey> matches that of any node on which a pod of the set of pods is running 
+Type
+     `object`
+Required
+    
+
+  * `topologyKey`
+
+
+
+Property| Type| Description  
+---|---|---  
+`labelSelector` |  `object` |  A label query over a set of resources, in this case pods. If it’s null, this PodAffinityTerm matches with no Pods.   
+`matchLabelKeys` |  `array (string)` |  MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod’s pod (anti) affinity. Keys that don’t exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn’t set.   
+`mismatchLabelKeys` |  `array (string)` |  MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod’s pod (anti) affinity. Keys that don’t exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn’t set.   
+`namespaceSelector` |  `object` |  A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means "this pod’s namespace". An empty selector ({}) matches all namespaces.   
+`namespaces` |  `array (string)` |  namespaces specifies a static list of namespace names that the term applies to. The term is applied to the union of the namespaces listed in this field and the ones selected by namespaceSelector. null or empty namespaces list and null namespaceSelector means "this pod’s namespace".   
+`topologyKey` |  `string` |  This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching the labelSelector in the specified namespaces, where co-located is defined as running on a node whose value of the label with key topologyKey matches that of any node on which any of the selected pods is running. Empty topologyKey is not allowed.   
+Show more
+
+## 2.1.31. .spec.grpcPodConfig.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution[].labelSelector
+
+Description
+     A label query over a set of resources, in this case pods. If it’s null, this PodAffinityTerm matches with no Pods. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`matchExpressions` |  `array` |  matchExpressions is a list of label selector requirements. The requirements are ANDed.   
+`matchExpressions[]` |  `object` |  A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.   
+`matchLabels` |  `object (string)` |  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.   
+Show more
+
+## 2.1.32. .spec.grpcPodConfig.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution[].labelSelector.matchExpressions
+
+Description
+     matchExpressions is a list of label selector requirements. The requirements are ANDed. 
+Type
+     `array`
+
+## 2.1.33. .spec.grpcPodConfig.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution[].labelSelector.matchExpressions[]
+
+Description
+     A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values. 
+Type
+     `object`
+Required
+    
+
+  * `key`
+  * `operator`
+
+
+
+Property| Type| Description  
+---|---|---  
+`key` |  `string` |  key is the label key that the selector applies to.   
+`operator` |  `string` |  operator represents a key’s relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.   
+`values` |  `array (string)` |  values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.   
+Show more
+
+## 2.1.34. .spec.grpcPodConfig.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution[].namespaceSelector
+
+Description
+     A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means "this pod’s namespace". An empty selector ({}) matches all namespaces. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`matchExpressions` |  `array` |  matchExpressions is a list of label selector requirements. The requirements are ANDed.   
+`matchExpressions[]` |  `object` |  A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.   
+`matchLabels` |  `object (string)` |  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.   
+Show more
+
+## 2.1.35. .spec.grpcPodConfig.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution[].namespaceSelector.matchExpressions
+
+Description
+     matchExpressions is a list of label selector requirements. The requirements are ANDed. 
+Type
+     `array`
+
+## 2.1.36. .spec.grpcPodConfig.affinity.podAffinity.requiredDuringSchedulingIgnoredDuringExecution[].namespaceSelector.matchExpressions[]
+
+Description
+     A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values. 
+Type
+     `object`
+Required
+    
+
+  * `key`
+  * `operator`
+
+
+
+Property| Type| Description  
+---|---|---  
+`key` |  `string` |  key is the label key that the selector applies to.   
+`operator` |  `string` |  operator represents a key’s relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.   
+`values` |  `array (string)` |  values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.   
+Show more
+
+## 2.1.37. .spec.grpcPodConfig.affinity.podAntiAffinity
+
+Description
+     Describes pod anti-affinity scheduling rules (e.g. avoid putting this pod in the same node, zone, etc. as some other pod(s)). 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`preferredDuringSchedulingIgnoredDuringExecution` |  `array` |  The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and subtracting "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.   
+`preferredDuringSchedulingIgnoredDuringExecution[]` |  `object` |  The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)   
+`requiredDuringSchedulingIgnoredDuringExecution` |  `array` |  If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied.   
+`requiredDuringSchedulingIgnoredDuringExecution[]` |  `object` |  Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key <topologyKey> matches that of any node on which a pod of the set of pods is running   
+Show more
+
+## 2.1.38. .spec.grpcPodConfig.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution
+
+Description
+     The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and subtracting "weight" from the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred. 
+Type
+     `array`
+
+## 2.1.39. .spec.grpcPodConfig.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[]
+
+Description
+     The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s) 
+Type
+     `object`
+Required
+    
+
+  * `podAffinityTerm`
+  * `weight`
+
+
+
+Property| Type| Description  
+---|---|---  
+`podAffinityTerm` |  `object` |  Required. A pod affinity term, associated with the corresponding weight.   
+`weight` |  `integer` |  weight associated with matching the corresponding podAffinityTerm, in the range 1-100.   
+Show more
+
+## 2.1.40. .spec.grpcPodConfig.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm
+
+Description
+     Required. A pod affinity term, associated with the corresponding weight. 
+Type
+     `object`
+Required
+    
+
+  * `topologyKey`
+
+
+
+Property| Type| Description  
+---|---|---  
+`labelSelector` |  `object` |  A label query over a set of resources, in this case pods. If it’s null, this PodAffinityTerm matches with no Pods.   
+`matchLabelKeys` |  `array (string)` |  MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod’s pod (anti) affinity. Keys that don’t exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn’t set.   
+`mismatchLabelKeys` |  `array (string)` |  MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod’s pod (anti) affinity. Keys that don’t exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn’t set.   
+`namespaceSelector` |  `object` |  A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means "this pod’s namespace". An empty selector ({}) matches all namespaces.   
+`namespaces` |  `array (string)` |  namespaces specifies a static list of namespace names that the term applies to. The term is applied to the union of the namespaces listed in this field and the ones selected by namespaceSelector. null or empty namespaces list and null namespaceSelector means "this pod’s namespace".   
+`topologyKey` |  `string` |  This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching the labelSelector in the specified namespaces, where co-located is defined as running on a node whose value of the label with key topologyKey matches that of any node on which any of the selected pods is running. Empty topologyKey is not allowed.   
+Show more
+
+## 2.1.41. .spec.grpcPodConfig.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm.labelSelector
+
+Description
+     A label query over a set of resources, in this case pods. If it’s null, this PodAffinityTerm matches with no Pods. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`matchExpressions` |  `array` |  matchExpressions is a list of label selector requirements. The requirements are ANDed.   
+`matchExpressions[]` |  `object` |  A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.   
+`matchLabels` |  `object (string)` |  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.   
+Show more
+
+## 2.1.42. .spec.grpcPodConfig.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm.labelSelector.matchExpressions
+
+Description
+     matchExpressions is a list of label selector requirements. The requirements are ANDed. 
+Type
+     `array`
+
+## 2.1.43. .spec.grpcPodConfig.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm.labelSelector.matchExpressions[]
+
+Description
+     A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values. 
+Type
+     `object`
+Required
+    
+
+  * `key`
+  * `operator`
+
+
+
+Property| Type| Description  
+---|---|---  
+`key` |  `string` |  key is the label key that the selector applies to.   
+`operator` |  `string` |  operator represents a key’s relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.   
+`values` |  `array (string)` |  values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.   
+Show more
+
+## 2.1.44. .spec.grpcPodConfig.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm.namespaceSelector
+
+Description
+     A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means "this pod’s namespace". An empty selector ({}) matches all namespaces. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`matchExpressions` |  `array` |  matchExpressions is a list of label selector requirements. The requirements are ANDed.   
+`matchExpressions[]` |  `object` |  A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.   
+`matchLabels` |  `object (string)` |  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.   
+Show more
+
+## 2.1.45. .spec.grpcPodConfig.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm.namespaceSelector.matchExpressions
+
+Description
+     matchExpressions is a list of label selector requirements. The requirements are ANDed. 
+Type
+     `array`
+
+## 2.1.46. .spec.grpcPodConfig.affinity.podAntiAffinity.preferredDuringSchedulingIgnoredDuringExecution[].podAffinityTerm.namespaceSelector.matchExpressions[]
+
+Description
+     A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values. 
+Type
+     `object`
+Required
+    
+
+  * `key`
+  * `operator`
+
+
+
+Property| Type| Description  
+---|---|---  
+`key` |  `string` |  key is the label key that the selector applies to.   
+`operator` |  `string` |  operator represents a key’s relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.   
+`values` |  `array (string)` |  values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.   
+Show more
+
+## 2.1.47. .spec.grpcPodConfig.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution
+
+Description
+     If the anti-affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the anti-affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to a pod label update), the system may or may not try to eventually evict the pod from its node. When there are multiple elements, the lists of nodes corresponding to each podAffinityTerm are intersected, i.e. all terms must be satisfied. 
+Type
+     `array`
+
+## 2.1.48. .spec.grpcPodConfig.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[]
+
+Description
+     Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key <topologyKey> matches that of any node on which a pod of the set of pods is running 
+Type
+     `object`
+Required
+    
+
+  * `topologyKey`
+
+
+
+Property| Type| Description  
+---|---|---  
+`labelSelector` |  `object` |  A label query over a set of resources, in this case pods. If it’s null, this PodAffinityTerm matches with no Pods.   
+`matchLabelKeys` |  `array (string)` |  MatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key in (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod’s pod (anti) affinity. Keys that don’t exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both matchLabelKeys and labelSelector. Also, matchLabelKeys cannot be set when labelSelector isn’t set.   
+`mismatchLabelKeys` |  `array (string)` |  MismatchLabelKeys is a set of pod label keys to select which pods will be taken into consideration. The keys are used to lookup values from the incoming pod labels, those key-value labels are merged with `labelSelector` as `key notin (value)` to select the group of existing pods which pods will be taken into consideration for the incoming pod’s pod (anti) affinity. Keys that don’t exist in the incoming pod labels will be ignored. The default value is empty. The same key is forbidden to exist in both mismatchLabelKeys and labelSelector. Also, mismatchLabelKeys cannot be set when labelSelector isn’t set.   
+`namespaceSelector` |  `object` |  A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means "this pod’s namespace". An empty selector ({}) matches all namespaces.   
+`namespaces` |  `array (string)` |  namespaces specifies a static list of namespace names that the term applies to. The term is applied to the union of the namespaces listed in this field and the ones selected by namespaceSelector. null or empty namespaces list and null namespaceSelector means "this pod’s namespace".   
+`topologyKey` |  `string` |  This pod should be co-located (affinity) or not co-located (anti-affinity) with the pods matching the labelSelector in the specified namespaces, where co-located is defined as running on a node whose value of the label with key topologyKey matches that of any node on which any of the selected pods is running. Empty topologyKey is not allowed.   
+Show more
+
+## 2.1.49. .spec.grpcPodConfig.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[].labelSelector
+
+Description
+     A label query over a set of resources, in this case pods. If it’s null, this PodAffinityTerm matches with no Pods. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`matchExpressions` |  `array` |  matchExpressions is a list of label selector requirements. The requirements are ANDed.   
+`matchExpressions[]` |  `object` |  A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.   
+`matchLabels` |  `object (string)` |  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.   
+Show more
+
+## 2.1.50. .spec.grpcPodConfig.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[].labelSelector.matchExpressions
+
+Description
+     matchExpressions is a list of label selector requirements. The requirements are ANDed. 
+Type
+     `array`
+
+## 2.1.51. .spec.grpcPodConfig.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[].labelSelector.matchExpressions[]
+
+Description
+     A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values. 
+Type
+     `object`
+Required
+    
+
+  * `key`
+  * `operator`
+
+
+
+Property| Type| Description  
+---|---|---  
+`key` |  `string` |  key is the label key that the selector applies to.   
+`operator` |  `string` |  operator represents a key’s relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.   
+`values` |  `array (string)` |  values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.   
+Show more
+
+## 2.1.52. .spec.grpcPodConfig.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[].namespaceSelector
+
+Description
+     A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means "this pod’s namespace". An empty selector ({}) matches all namespaces. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`matchExpressions` |  `array` |  matchExpressions is a list of label selector requirements. The requirements are ANDed.   
+`matchExpressions[]` |  `object` |  A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.   
+`matchLabels` |  `object (string)` |  matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.   
+Show more
+
+## 2.1.53. .spec.grpcPodConfig.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[].namespaceSelector.matchExpressions
+
+Description
+     matchExpressions is a list of label selector requirements. The requirements are ANDed. 
+Type
+     `array`
+
+## 2.1.54. .spec.grpcPodConfig.affinity.podAntiAffinity.requiredDuringSchedulingIgnoredDuringExecution[].namespaceSelector.matchExpressions[]
+
+Description
+     A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values. 
+Type
+     `object`
+Required
+    
+
+  * `key`
+  * `operator`
+
+
+
+Property| Type| Description  
+---|---|---  
+`key` |  `string` |  key is the label key that the selector applies to.   
+`operator` |  `string` |  operator represents a key’s relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.   
+`values` |  `array (string)` |  values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.   
+Show more
+
+## 2.1.55. .spec.grpcPodConfig.extractContent
+
+Description
+     ExtractContent configures the gRPC catalog Pod to extract catalog metadata from the provided index image and use a well-known version of the `opm` server to expose it. The catalog index image that this CatalogSource is configured to use **must** be using the file-based catalogs in order to utilize this feature. 
+Type
+     `object`
+Required
+    
+
+  * `catalogDir`
+
+
+
+Property| Type| Description  
+---|---|---  
+`cacheDir` |  `string` |  CacheDir is the (optional) directory storing the pre-calculated API cache.   
+`catalogDir` |  `string` |  CatalogDir is the directory storing the file-based catalog contents.   
+Show more
+
+## 2.1.56. .spec.grpcPodConfig.tolerations
+
+Description
+     Tolerations are the catalog source’s pod’s tolerations. 
+Type
+     `array`
+
+## 2.1.57. .spec.grpcPodConfig.tolerations[]
+
+Description
+     The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`effect` |  `string` |  Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.   
+`key` |  `string` |  Key is the taint key that the toleration applies to. Empty means match all taint keys. If the key is empty, operator must be Exists; this combination means to match all values and all keys.   
+`operator` |  `string` |  Operator represents a key’s relationship to the value. Valid operators are Exists, Equal, Lt, and Gt. Defaults to Equal. Exists is equivalent to wildcard for value, so that a pod can tolerate all taints of a particular category. Lt and Gt perform numeric comparisons (requires feature gate TaintTolerationComparisonOperators).   
+`tolerationSeconds` |  `integer` |  TolerationSeconds represents the period of time the toleration (which must be of effect NoExecute, otherwise this field is ignored) tolerates the taint. By default, it is not set, which means tolerate the taint forever (do not evict). Zero and negative values will be treated as 0 (evict immediately) by the system.   
+`value` |  `string` |  Value is the taint value the toleration matches to. If the operator is Exists, the value should be empty, otherwise just a regular string.   
+Show more
+
+## 2.1.58. .spec.icon
+
+Description
+    
+Type
+     `object`
+Required
+    
+
+  * `base64data`
+  * `mediatype`
+
+
+
+Property| Type| Description  
+---|---|---  
+`base64data` |  `string` |   
+`mediatype` |  `string` |   
+Show more
+
+## 2.1.59. .spec.updateStrategy
+
+Description
+     UpdateStrategy defines how updated catalog source images can be discovered Consists of an interval that defines polling duration and an embedded strategy type 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`registryPoll` |  `object` |   
+Show more
+
+## 2.1.60. .spec.updateStrategy.registryPoll
+
+Description
+    
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`interval` |  `string` |  Interval is used to determine the time interval between checks of the latest catalog source version. The catalog operator polls to see if a new version of the catalog source is available. If available, the latest image is pulled and gRPC traffic is directed to the latest catalog source.   
+Show more
+
+## 2.1.61. .status
+
+Description
+    
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`conditions` |  `array` |  Represents the state of a CatalogSource. Note that Message and Reason represent the original status information, which may be migrated to be conditions based in the future. Any new features introduced will use conditions.   
+`conditions[]` |  `object` |  Condition contains details for one aspect of the current state of this API Resource.   
+`configMapReference` |  `object` |  ConfigMapReference (deprecated) is the reference to the ConfigMap containing the catalog source’s configuration, when the catalog source is a ConfigMap   
+`connectionState` |  `object` |  ConnectionState represents the current state of the CatalogSource’s connection to the registry   
+`latestImageRegistryPoll` |  `string` |  The last time the CatalogSource image registry has been polled to ensure the image is up-to-date   
+`message` |  `string` |  A human readable message indicating details about why the CatalogSource is in this condition.   
+`reason` |  `string` |  Reason is the reason the CatalogSource was transitioned to its current state.   
+`registryService` |  `object` |  RegistryService represents the current state of the GRPC service used to serve the catalog   
+Show more
+
+## 2.1.62. .status.conditions
+
+Description
+     Represents the state of a CatalogSource. Note that Message and Reason represent the original status information, which may be migrated to be conditions based in the future. Any new features introduced will use conditions. 
+Type
+     `array`
+
+## 2.1.63. .status.conditions[]
+
+Description
+     Condition contains details for one aspect of the current state of this API Resource. 
+Type
+     `object`
+Required
+    
+
+  * `lastTransitionTime`
+  * `message`
+  * `reason`
+  * `status`
+  * `type`
+
+
+
+Property| Type| Description  
+---|---|---  
+`lastTransitionTime` |  `string` |  lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed. If that is not known, then using the time when the API field changed is acceptable.   
+`message` |  `string` |  message is a human readable message indicating details about the transition. This may be an empty string.   
+`observedGeneration` |  `integer` |  observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.   
+`reason` |  `string` |  reason contains a programmatic identifier indicating the reason for the condition’s last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.   
+`status` |  `string` |  status of the condition, one of True, False, Unknown.   
+`type` |  `string` |  type of condition in CamelCase or in foo.example.com/CamelCase.   
+Show more
+
+## 2.1.64. .status.configMapReference
+
+Description
+     ConfigMapReference (deprecated) is the reference to the ConfigMap containing the catalog source’s configuration, when the catalog source is a ConfigMap 
+Type
+     `object`
+Required
+    
+
+  * `name`
+  * `namespace`
+
+
+
+Property| Type| Description  
+---|---|---  
+`lastUpdateTime` |  `string` |   
+`name` |  `string` |   
+`namespace` |  `string` |   
+`resourceVersion` |  `string` |   
+`uid` |  `string` |  UID is a type that holds unique ID values, including UUIDs. Because we don’t ONLY use UUIDs, this is an alias to string. Being a type captures intent and helps make sure that UIDs and names do not get conflated.   
+Show more
+
+## 2.1.65. .status.connectionState
+
+Description
+     ConnectionState represents the current state of the CatalogSource’s connection to the registry 
+Type
+     `object`
+Required
+    
+
+  * `lastObservedState`
+
+
+
+Property| Type| Description  
+---|---|---  
+`address` |  `string` |   
+`lastConnect` |  `string` |   
+`lastObservedState` |  `string` |   
+Show more
+
+## 2.1.66. .status.registryService
+
+Description
+     RegistryService represents the current state of the GRPC service used to serve the catalog 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`createdAt` |  `string` |   
+`port` |  `string` |   
+`protocol` |  `string` |   
+`serviceName` |  `string` |   
+`serviceNamespace` |  `string` |   
+Show more

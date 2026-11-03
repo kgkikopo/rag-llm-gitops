@@ -1,0 +1,56 @@
+# 3.4. NFD core configuration parameters
+
+The following core configuration parameters control Node Feature Discovery (NFD) feature detection intervals, label filtering, and publishing behavior across all feature sources. 
+
+`core.sleepInterval`
+    
+
+Specifies the interval between consecutive passes of feature detection or re-detection, and therefore also the interval between node re-labeling. A non-positive value implies an infinite sleep interval; no re-detection or re-labeling is done. This value is overridden by the deprecated `--sleep-interval` command-line flag, if specified. The default value is `60s`. 
+
+**Example usage**
+
+```yaml
+core:
+  sleepInterval: 60s
+```
+
+
+`core.sources`
+    
+
+Specifies the list of enabled feature sources. A special value `all` enables all feature sources. This value is overridden by the deprecated `--sources` command-line flag, if specified. Default: `[all]`. 
+
+**Example usage**
+
+```yaml
+core:
+  sources:
+    - system
+    - custom
+```
+
+
+`core.labelWhiteList`
+    
+
+Specifies a regular expression for filtering feature labels based on the label name. Non-matching labels are not published. The regular expression is only matched against the basename part of the label, the part of the name after '/'. The label prefix, or namespace, is omitted. This value is overridden by the deprecated `--label-whitelist` command-line flag, if specified. Default: `null`. 
+
+**Example usage**
+
+```yaml
+core:
+  labelWhiteList: '^cpu-cpuid'
+```
+
+
+`core.noPublish`
+    
+
+Setting `core.noPublish` to `true` disables all communication with the `nfd-master`. It is effectively a dry run flag; `nfd-worker` runs feature detection normally, but no labeling requests are sent to `nfd-master`. This value is overridden by the `--no-publish` command-line flag, if specified. The default value is `false`. 
+
+**Example usage**
+
+```yaml
+core:
+  noPublish: true
+```

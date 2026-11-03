@@ -1,0 +1,24 @@
+# 1.2. Working on an application
+
+Manage your complete application lifecycle by creating, maintaining, and deploying software by using the web console, CLI, or Operators to optimize cluster resources and minimize downtime. 
+
+Creating an application
+    
+
+To create applications, you must have created a project or have access to a project with the appropriate roles and permissions. You can create an application by using either installed Operators, or the OpenShift CLI (`oc`). You can source the applications to be added to the project from Git, JAR files, devfiles, or the developer catalog. 
+
+You can also use components that include source or binary code, images, and templates to create an application by using the OpenShift CLI (`oc`). With the OpenShift Container Platform web console, you can create an application from an Operator installed by a cluster administrator. 
+
+Maintaining an application
+    
+
+After you create the application, you can use the web console to monitor your project or application metrics. You can also edit or delete the application using the web console. 
+
+When the application is running, not all application resources are used. As a cluster administrator, you can choose to idle these scalable resources to reduce resource consumption. 
+
+Deploying an application
+    
+
+You can deploy your application using `Deployment` or `DeploymentConfig` objects and manage them from the web console. You can create deployment strategies that help reduce downtime during a change or an upgrade to the application. 
+
+You can also use Helm, a software package manager that simplifies deployment of applications and services to OpenShift Container Platform clusters.

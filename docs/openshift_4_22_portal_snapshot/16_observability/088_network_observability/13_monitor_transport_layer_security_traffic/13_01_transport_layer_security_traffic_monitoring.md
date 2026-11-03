@@ -1,0 +1,30 @@
+# 13.1. Transport Layer Security traffic monitoring
+
+Transport Layer Security (TLS) traffic monitoring identifies security risks and maintains compliance by analyzing encrypted traffic metadata without decryption. 
+
+As a network administrator or security practitioner, you must verify that encrypted traffic uses secure protocols and cipher suites. Monitoring TLS usage identifies security risks, such as workloads that use deprecated TLS versions, and helps maintain compliance with cluster security policies. 
+
+## 13.1.1. Security improvements through metadata analysis
+
+The Network Observability Operator captures TLS metadata from handshake messages without decrypting traffic, providing visibility into encryption protocols while maintaining data privacy. This approach enables the following improvements: 
+
+Security risk detection
+     Identifies workloads using deprecated TLS versions (1.0, 1.1) or weak cipher suites by capturing TLS version, cipher suite, and group information. You can configure Prometheus alerts to automatically report deprecated TLS configurations. 
+Compliance auditing
+     Audits TLS configurations to meet regulatory requirements through metric aggregation in dashboard charts and overview panels. You can filter flows by TLS fields to isolate specific protocol versions or cipher suites for compliance reporting. 
+Security posture assessment
+     Visualizes encrypted network traffic with lock icons in the topology view and identifies unencrypted communications across your cluster. You can analyze TLS usage patterns to evaluate your overall security posture. 
+Remediation prioritization
+     Targets workloads using deprecated protocols for updates by filtering and analyzing TLS fields to isolate problematic connections requiring immediate attention. 
+
+## 13.1.2. TLS Tracking feature view
+
+When TLS tracking is enabled, you can select the **TLS Tracking** preconfigured feature view from the view selector in the **Network Traffic** page. This view automatically displays TLS-specific panels and columns, providing faster access to TLS monitoring metrics without manual configuration. 
+
+## 13.1.3. TLS traffic monitoring workflow phases
+
+To monitor TLS traffic effectively, complete the following phases: 
+
+  * Enable the TLS tracking feature in the eBPF agent configuration. 
+  * Analyze TLS traffic details in the **Network Traffic** view. 
+  * Visualize secure connections in the **Topology** view.

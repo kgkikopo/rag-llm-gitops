@@ -1,0 +1,90 @@
+# 4.5. Installing a cluster with the support for configuring multi-architecture compute machines
+
+To run workloads across `x86_64` and ARM nodes, you can install an OpenShift Container Platform cluster on Amazon Web Services (AWS) with multi-architecture compute machine support. 
+
+Note
+
+When you have nodes with multiple architectures in your cluster, the architecture of your image must be consistent with the architecture of the node. You must ensure that the pod is assigned to the node with the appropriate architecture and that it matches the image architecture. 
+
+You can install an AWS cluster with the support for configuring multi-architecture compute machines. After installing the AWS cluster, you can add multi-architecture compute machines to the cluster in the following ways: 
+
+  * Adding 64-bit x86 compute machines to a cluster that uses 64-bit ARM control plane machines and already includes 64-bit ARM compute machines. In this case, 64-bit x86 is the secondary architecture. 
+  * Adding 64-bit ARM compute machines to a cluster that uses 64-bit x86 control plane machines and already includes 64-bit x86 compute machines. In this case, 64-bit ARM is the secondary architecture. 
+
+
+
+Note
+
+Before adding a secondary architecture node to your cluster, it is recommended to install the Multiarch Tuning Operator, and deploy a `ClusterPodPlacementConfig` custom resource. For more information, see "Managing workloads on multi-architecture clusters by using the Multiarch Tuning Operator". 
+
+## 4.5.1. Install a cluster with multi-architecture support
+
+You can install a cluster with multi-architecture support to use compute machines with different Central Processing Unit (CPU) architectures. Modifying your configuration file helps ensure your control plane and worker nodes deploy with the correct architecture. 
+
+**Prerequisites**
+
+  * You installed the OpenShift CLI (`oc`). 
+  * You have the OpenShift Container Platform installation program. 
+  * You downloaded the pull secret for your cluster. 
+
+
+
+**Procedure**
+
+  1. Check that the `openshift-install` binary is using the `multi` payload by running the following command: 
+
+```shell-session
+$ ./openshift-install version
+```
+
+
+**Example output**
+
+```shell-session
+./openshift-install 4.22.0
+built from commit abc123etc
+release image quay.io/openshift-release-dev/ocp-release@sha256:abc123wxyzetc
+release architecture multi
+default architecture amd64
+```
+
+
+The output must contain `release architecture multi` to indicate that the `openshift-install` binary is using the `multi` payload. 
+
+  2. Update the `install-config.yaml` file to configure the architecture for the nodes. 
+
+**Sample`install-config.yaml` file with multi-architecture configuration**
+
+```yaml
+apiVersion: v1
+baseDomain: example.openshift.com
+compute:
+- architecture: amd64
+  hyperthreading: Enabled
+  name: worker
+  platform: {}
+  replicas: 3
+controlPlane:
+  architecture: arm64
+  name: master
+  platform: {}
+  replicas: 3
+# ...
+```
+
+
+where: 
+
+`compute.architecture`
+     Specifies the architecture of the worker node. You can set this field to either `arm64` or `amd64`. 
+`controlPlane.architecture`
+     Specifies the control plane node architecture. You can set this field to either `arm64` or `amd64`. 
+
+
+
+
+**Additional resources**
+
+  * [Deploying the cluster](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_aws/installer-provisioned-infrastructure#installation-launching-installer_installing-aws-localzone "3.8.16. Deploying the cluster")
+  * [Scheduling workloads on clusters with multi-architecture compute machines](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/postinstallation_configuration/#scheduling-workloads-on-clusters-with-multi-architecture-compute-machines)
+  * [Managing workloads on multi-architecture clusters by using the Multiarch Tuning Operator](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/postinstallation_configuration/#multiarch-tuning-operator)

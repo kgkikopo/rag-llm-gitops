@@ -1,0 +1,41 @@
+# 4.6. Configure IP failover for more than 254 addresses
+
+You can use the `OPENSHIFT_HA_VIP_GROUPS` variable to configure IP failover for more than 254 addresses by grouping multiple VIPs per VRRP instance. 
+
+Grouping VIPs creates a wider range of allocation of VIPs per VRRP in the case of VRRP failover events, and is useful when all hosts in the cluster have access to a service locally. For example, when a service is being exposed with an `ExternalIP`. 
+
+Note
+
+As a rule for failover, do not limit services, such as the router, to one specific host. Instead, services should be replicated to each host so that in the case of IP failover, the services do not have to be recreated on the new host. 
+
+Note
+
+If you are using OpenShift Container Platform health checks, the nature of IP failover and groups means that all instances in the group are not checked. For that reason, [the Kubernetes health checks](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/) must be used to ensure that services are live. 
+
+**Prerequisites**
+
+  * You are logged in to the cluster with a user with `cluster-admin` privileges. 
+
+
+
+**Procedure**
+
+  * To change the number of IP addresses assigned to each group, change the value for the `OPENSHIFT_HA_VIP_GROUPS` variable, for example: 
+
+**Example`Deployment` YAML for IP failover configuration**
+
+```yaml
+...
+    spec:
+        env:
+        - name: OPENSHIFT_HA_VIP_GROUPS
+          value: "3"
+...
+```
+
+
+In this example, the `OPENSHIFT_HA_VIP_GROUPS` variable is set to `3`. In an environment with seven VIPs, it creates three groups, assigning three VIPs to the first group, and two VIPs to the two remaining groups. 
+
+Note
+
+If the number of groups set by `OPENSHIFT_HA_VIP_GROUPS` is fewer than the number of IP addresses set to fail over, the group contains more than one IP address, and all of the addresses move as a single unit.

@@ -1,0 +1,842 @@
+# 11.7. Configuring an ACME issuer
+
+The cert-manager Operator for Red Hat OpenShift supports using Automated Certificate Management Environment (ACME) CA servers, such as _Let’s Encrypt_ , to issue certificates. Explicit credentials are configured by specifying the secret details in the `Issuer` API object. Ambient credentials are extracted from the environment, metadata services, or local files which are not explicitly configured in the `Issuer` API object. 
+
+The `Issuer` object is namespace scoped. It can only issue certificates from the same namespace. You can also use the `ClusterIssuer` object to issue certificates across all namespaces in the cluster. 
+
+**Example YAML file that defines the`ClusterIssuer` object**
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: acme-cluster-issuer
+spec:
+  acme:
+    ...
+```
+
+
+Note
+
+By default, you can use the `ClusterIssuer` object with ambient credentials. To use the `Issuer` object with ambient credentials, you must enable the `--issuer-ambient-credentials` setting for the cert-manager controller. 
+
+## 11.7.1. About ACME issuers
+
+The ACME issuer type for the cert-manager Operator for Red Hat OpenShift represents an Automated Certificate Management Environment (ACME) certificate authority (CA) server. ACME CA servers rely on a _challenge_ to verify that a client owns the domain names that the certificate is being requested for. 
+
+If the challenge is successful, the cert-manager Operator for Red Hat OpenShift can issue the certificate. If the challenge fails, the cert-manager Operator for Red Hat OpenShift does not issue the certificate. 
+
+Note
+
+Private DNS zones are not supported with _Let’s Encrypt_ and internet ACME servers. 
+
+### 11.7.1.1. Supported ACME challenges types
+
+To validate domain ownership with ACME issuers, you can use the challenge types supported by the cert-manager Operator for Red Hat OpenShift. 
+
+The cert-manager Operator for Red Hat OpenShift supports the following challenge types for ACME issuers: 
+
+HTTP-01
+     With the HTTP-01 challenge type, you provide a computed key at an HTTP URL endpoint in your domain. If the ACME CA server can get the key from the URL, it can validate you as the owner of the domain. 
+
+Note
+
+HTTP-01 requires that the Let’s Encrypt servers can access the route of the cluster. If an internal or private cluster is behind a proxy, the HTTP-01 validations for certificate issuance fail. 
+
+The HTTP-01 challenge is restricted to port 80. 
+
+DNS-01
+     With the DNS-01 challenge type, you provide a computed key at a DNS TXT record. If the ACME CA server can get the key by DNS lookup, it can validate you as the owner of the domain. 
+
+### 11.7.1.2. Supported DNS-01 providers
+
+To configure DNS-01 challenges for ACME issuers, you can validate domain ownership by integrating with supported services, such as Amazon Route 53, Azure DNS, and Google Cloud DNS, or by using Webhooks. 
+
+The cert-manager Operator for Red Hat OpenShift supports the following DNS-01 providers for ACME issuers: 
+
+  * Amazon Route 53 
+  * Azure DNS 
+
+Note
+
+The cert-manager Operator for Red Hat OpenShift does not support using Microsoft Entra ID pod identities to assign a managed identity to a pod. 
+
+  * Google Cloud DNS 
+  * Webhook 
+
+Red Hat tests and supports DNS providers using an external webhook with cert-manager on OpenShift Container Platform. See "cert-manager-webhook-ibmcis" for the list of DNS providers that are tested and supported with OpenShift Container Platform. 
+
+Note
+
+Using a DNS provider that is not listed might work with OpenShift Container Platform, but the provider was not tested by Red Hat and therefore is not supported by Red Hat. 
+
+
+
+
+**Additional resources**
+
+  * [cert-manager-webhook-ibmcis](https://github.com/jb-dk/cert-manager-webhook-ibmcis)
+
+
+
+## 11.7.2. Configure an ACME issuer to solve HTTP-01 challenges
+
+You can use cert-manager Operator for Red Hat OpenShift to set up an ACME issuer to solve HTTP-01 challenges. This procedure uses _Let’s Encrypt_ as the ACME CA server. 
+
+**Prerequisites**
+
+  * You have access to the cluster as a user with the `cluster-admin` role. 
+  * You have a service that you want to expose. In this procedure, the service is named `sample-workload`. 
+
+
+
+**Procedure**
+
+  1. Create an ACME cluster issuer. 
+
+     1. Create a YAML file, `acme-cluster-issuer.yaml`, that defines the `ClusterIssuer` object: 
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: <cluster_issuer_name>
+spec:
+  acme:
+    preferredChain: ""
+    privateKeySecretRef:
+      name: <secret_for_private_key>
+    server: <url>
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: <ingress_class_name>
+```
+
+
+where: 
+
+`<cluster_issuer_name>`
+     Specifies a name for the cluster issuer. 
+`<secret_for_private_key>`
+     Specifies the name of secret to store the ACME account private key in. 
+`<url>`
+     Specifies the URL to access the ACME server’s `directory` endpoint. This example uses the _Let’s Encrypt_ staging environment. 
+`<ingress_class_name>`
+     Specifies the Ingress class, for example, `openshift-default`. 
+
+     2. Optional: If you create the object without specifying `ingressClassName`, use the following command to patch the existing ingress: 
+
+```shell-session
+$ oc patch ingress/<ingress-name> --type=merge --patch '{"spec":{"ingressClassName":"openshift-default"}}' -n <namespace>
+```
+
+
+     3. Create the `ClusterIssuer` object by running the following command: 
+
+```shell-session
+$ oc create -f acme-cluster-issuer.yaml
+```
+
+
+  2. Create an Ingress to expose the service of the user workload. 
+
+     1. Create a YAML file, for example, `namespace.yaml`, that defines a `Namespace` object: 
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: <ingress_namespace>
+```
+
+
+Replace `<ingress_namespace>` with the namespace for the Ingress. 
+
+     2. Create the `Namespace` object by running the following command: 
+
+```shell-session
+$ oc create -f namespace.yaml
+```
+
+
+     3. Create a YAML file, for example, `ingress.yaml`, that defines the `Ingress` object: 
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: <ingress_name>
+  namespace: <ingress_namespace>
+  annotations:
+    cert-manager.io/cluster-issuer: <cluster_issuer_name>
+spec:
+  ingressClassName: <ingress_class_name>
+  tls:
+  - hosts:
+    - <tls_hostname>
+    secretName: <secret_name>
+  rules:
+  - host: <hostname>
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: <service_name>
+            port:
+              number: 80
+```
+
+
+where: 
+
+`<ingress_name>`
+     Specifies the name of the Ingress. 
+`<ingress_namespace>`
+     Specifies the namespace that you created for the Ingress. 
+`<cluster_issuer_name>`
+     Specifies the cluster issuer that you created. 
+`<ingress_class_name>`
+     Specifies the Ingress class name. 
+`<tls_hostname>`
+     Specifies the Subject Alternative Name (SAN) to be associated with the certificate. This name is used to add DNS names to the certificate. 
+`<secret_name>`
+     Specifies the secret that stores the certificate. 
+`<hostname>`
+     Specifies the host name. You can use the `<host_name>.<cluster_ingress_domain>` syntax to take advantage of the `*.<cluster_ingress_domain>` wildcard DNS record and serving certificate for the cluster. For example, you might use `apps.<cluster_base_domain>`. Otherwise, you must ensure that a DNS record exists for the chosen hostname. 
+`<service_name>`
+     Specifies the name of the service to expose. This example uses a service named `sample-workload`. 
+
+     4. Create the `Ingress` object by running the following command: 
+
+```shell-session
+$ oc create -f ingress.yaml
+```
+
+
+## 11.7.3. Configure an ACME issuer by using explicit credentials for AWS Route53
+
+You can use cert-manager Operator for Red Hat OpenShift to set up an Automated Certificate Management Environment (ACME) issuer to solve DNS-01 challenges by using explicit credentials on AWS. 
+
+This procedure uses _Let’s Encrypt_ as the ACME certificate authority (CA) server and shows how to solve DNS-01 challenges with Amazon Route 53. 
+
+**Prerequisites**
+
+  * You must provide the explicit `accessKeyID` and `secretAccessKey` credentials. For more information, see [Route53](https://cert-manager.io/docs/configuration/acme/dns01/route53/) in the upstream cert-manager documentation. 
+
+Note
+
+You can use Amazon Route 53 with explicit credentials in an OpenShift Container Platform cluster that is not running on AWS. 
+
+
+
+
+**Procedure**
+
+  1. Optional: Override the name server settings for the DNS-01 self check. 
+
+This step is required only when the target public-hosted zone overlaps with the cluster’s default private-hosted zone. 
+
+     1. Edit the `CertManager` resource by running the following command: 
+
+```shell-session
+$ oc edit certmanager cluster
+```
+
+
+     2. Add a `spec.controllerConfig` section with the following override arguments: 
+
+```yaml
+apiVersion: operator.openshift.io/v1alpha1
+kind: CertManager
+metadata:
+  name: cluster
+  ...
+spec:
+  ...
+  controllerConfig:
+    overrideArgs:
+      - '--dns01-recursive-nameservers-only'
+      - '--dns01-recursive-nameservers=1.1.1.1:53'
+```
+
+
+where: 
+
+`--dns01-recursive-nameservers-only`
+     Specifies recursive name servers instead of checking the authoritative name servers associated with that domain. 
+`--dns01-recursive-nameservers=1.1.1.1:53`
+     Specifies a comma-separated list of `<host>:<port>` names servers to query for the DNS-01 self check. You must use a `1.1.1.1:53` value to avoid the public and private zones overlapping. 
+
+     3. Save the file to apply the changes. 
+
+  2. Optional: Create a namespace for the issuer: 
+
+```shell-session
+$ oc new-project <issuer_namespace>
+```
+
+
+  3. Create a secret to store your AWS credentials in by running the following command: 
+
+```shell-session
+$ oc create secret -n my-issuer-namespace generic aws-secret \
+  --from-literal=awsSecretAccessKey=<aws_secret_access_key>
+```
+
+
+Replace `<aws_secret_access_key>` with your AWS secret access key. 
+
+  4. Create an issuer: 
+
+     1. Create a YAML file that defines the `Issuer` object: 
+
+**Example`issuer.yaml` file**
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: <issuer_name>
+  namespace: <issuer_namespace>
+spec:
+  acme:
+    server: <server>
+    email: "<email_address>"
+    privateKeySecretRef:
+      name: <secret_private_key>
+    solvers:
+    - dns01:
+        route53:
+          accessKeyID: <aws_key_id>
+          hostedZoneID: <hosted_zone_id>
+          region: <region_name>
+          secretAccessKeySecretRef:
+            name: "<aws_secret>"
+            key: "<aws_secret_access_key>"
+```
+
+
+where: 
+
+`<issuer_name>`
+     Specifies a name for the issuer. 
+`<issuer_namespace>`
+     Specifies the namespace that you created for the issuer. 
+`server`
+     Specifies the URL to access the ACME server’s `directory` endpoint. This example uses the _Let’s Encrypt_ staging environment. 
+`<email_address>`
+     Specifies your email address. 
+`<secret_private_key>`
+     Specifies the name of the secret to store the ACME account private key in. 
+`<aws_key_id>`
+     Specifies your AWS key ID. 
+`<hosted_zone_id>`
+     Specifies your hosted zone ID. 
+`<region_name>`
+     Specifies the AWS region name. For example, `us-east-1`. 
+`<aws_secret>`
+     Specifies the name of the secret you created. 
+`<aws_secret_access_key>`
+     Specifies the key in the secret you created that stores your AWS secret access key. 
+
+     2. Create the `Issuer` object by running the following command: 
+
+```shell-session
+$ oc create -f issuer.yaml
+```
+
+
+## 11.7.4. Configure an ACME issuer by using ambient credentials on AWS
+
+You can use cert-manager Operator for Red Hat OpenShift to set up an ACME issuer to solve DNS-01 challenges by using ambient credentials on AWS. This procedure uses _Let’s Encrypt_ as the ACME CA server and shows how to solve DNS-01 challenges with Amazon Route 53. 
+
+**Prerequisites**
+
+  * If your cluster is configured to use the AWS Security Token Service (STS), you followed the instructions from the _Configuring cloud credentials for the cert-manager Operator for Red Hat OpenShift for the AWS Security Token Service cluster_ section. 
+  * If your cluster does not use the AWS STS, you followed the instructions from the _Configuring cloud credentials for the cert-manager Operator for Red Hat OpenShift on AWS_ section. 
+
+
+
+**Procedure**
+
+  1. Optional: Override the name server settings for the DNS-01 self check. 
+
+This step is required only when the target public-hosted zone overlaps with the cluster’s default private-hosted zone. 
+
+     1. Edit the `CertManager` resource by running the following command: 
+
+```shell-session
+$ oc edit certmanager cluster
+```
+
+
+     2. Add a `spec.controllerConfig` section with the following override arguments: 
+
+```yaml
+apiVersion: operator.openshift.io/v1alpha1
+kind: CertManager
+metadata:
+  name: cluster
+  ...
+spec:
+  ...
+  controllerConfig:
+    overrideArgs:
+      - '--dns01-recursive-nameservers-only'
+      - '--dns01-recursive-nameservers=1.1.1.1:53'
+```
+
+
+where: 
+
+`--dns01-recursive-nameservers-only`
+     Specifies recursive name servers instead of checking the authoritative name servers associated with that domain. 
+`--dns01-recursive-nameservers=1.1.1.1:53`
+     Specifies a comma-separated list of `<host>:<port>` name servers to query for the DNS-01 self check. You must use a `1.1.1.1:53` value to avoid the public and private zones overlapping. 
+
+     3. Save the file to apply the changes. 
+
+  2. Optional: Create a namespace for the issuer: 
+
+```shell-session
+$ oc new-project <issuer_namespace>
+```
+
+
+  3. Modify the `CertManager` resource to add the `--issuer-ambient-credentials` argument: 
+
+```shell-session
+$ oc patch certmanager/cluster \
+  --type=merge \
+  -p='{"spec":{"controllerConfig":{"overrideArgs":["--issuer-ambient-credentials"]}}}'
+```
+
+
+  4. Create an issuer: 
+
+     1. Create a YAML file that defines the `Issuer` object: 
+
+**Example`issuer.yaml` file**
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: <issuer_name>
+  namespace: <issuer_namespace>
+spec:
+  acme:
+    server: <server>
+    email: "<email_address>"
+    privateKeySecretRef:
+      name: <secret_private_key>
+    solvers:
+    - dns01:
+        route53:
+          hostedZoneID: <hosted_zone_id>
+          region: us-east-1
+```
+
+
+where: 
+
+`<issuer_name>`
+     Specifies a name for the issuer. 
+`<issuer_namespace>`
+     Specifies the namespace that you created for the issuer. 
+`<server>`
+     Specifies the URL to access the ACME server’s `directory` endpoint. This example uses the _Let’s Encrypt_ staging environment. 
+`<email_address>`
+     Specifies your email address. 
+`<secret_private_key>`
+     Specifies the name of the secret to store the ACME account private key in. 
+`<hosted_zone_id>`
+     Specifies your hosted zone ID. 
+
+     2. Create the `Issuer` object by running the following command: 
+
+```shell-session
+$ oc create -f issuer.yaml
+```
+
+
+## 11.7.5. Configure an ACME issuer by using explicit credentials for Google Cloud DNS
+
+You can use the cert-manager Operator for Red Hat OpenShift to set up an ACME issuer to solve DNS-01 challenges by using explicit credentials on Google Cloud. This procedure uses _Let’s Encrypt_ as the ACME CA server and shows how to solve DNS-01 challenges with Google Cloud DNS. 
+
+**Prerequisites**
+
+  * You have set up a Google Cloud service account with a desired role for Google Cloud DNS. 
+
+Note
+
+You can use Google Cloud DNS with explicit credentials in an OpenShift Container Platform cluster that is not running on Google Cloud. 
+
+
+
+
+**Procedure**
+
+  1. Optional: Override the name server settings for the DNS-01 self check. 
+
+This step is required only when the target public-hosted zone overlaps with the cluster’s default private-hosted zone. 
+
+     1. Edit the `CertManager` resource by running the following command: 
+
+```shell-session
+$ oc edit certmanager cluster
+```
+
+
+     2. Add a `spec.controllerConfig` section with the following override arguments: 
+
+```yaml
+apiVersion: operator.openshift.io/v1alpha1
+kind: CertManager
+metadata:
+  name: cluster
+  ...
+spec:
+  ...
+  controllerConfig:
+    overrideArgs:
+      - '--dns01-recursive-nameservers-only'
+      - '--dns01-recursive-nameservers=1.1.1.1:53'
+```
+
+
+where: 
+
+`--dns01-recursive-nameservers-only`
+     Specifies recursive name servers instead of checking the authoritative name servers associated with that domain. 
+`--dns01-recursive-nameservers=1.1.1.1:53`
+     Specifies a comma-separated list of `<host>:<port>` name servers to query for the DNS-01 self check. You must use a `1.1.1.1:53` value to avoid the public and private zones overlapping. 
+
+     3. Save the file to apply the changes. 
+
+  2. Optional: Create a namespace for the issuer: 
+
+```shell-session
+$ oc new-project my-issuer-namespace
+```
+
+
+  3. Create a secret to store your Google Cloud credentials by running the following command: 
+
+```shell-session
+$ oc create secret generic clouddns-dns01-solver-svc-acct --from-file=service_account.json=<path/to/gcp_service_account.json> -n my-issuer-namespace
+```
+
+
+  4. Create an issuer: 
+
+     1. Create a YAML file, for example, `issuer.yaml`, that defines the `Issuer` object: 
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: <acme_dns01_clouddns_issuer>
+  namespace: <issuer_namespace>
+spec:
+  acme:
+    preferredChain: ""
+    privateKeySecretRef:
+      name: <secret_private_key>
+    server: <server>
+    solvers:
+    - dns01:
+        cloudDNS:
+          project: <project_id>
+          serviceAccountSecretRef:
+            name: <secret>
+            key: <service_account.json>
+```
+
+
+where: 
+
+`<acme_dns01_clouddns_issuer>`
+     Specifies a name for the issuer. 
+`<issuer_namespace>`
+     Specifies your issuer namespace. 
+`<secret_private_key>`
+     Specifies the name of the secret to store the ACME account private key in. 
+`<server>`
+     Specifies the URL to access the ACME server’s `directory` endpoint. This example uses the _Let’s Encrypt_ staging environment. 
+`<project_id>`
+     Specifies the name of the Google Cloud project that contains the Cloud DNS zone. 
+`<secret>`
+     Specifies the name of the secret you created. 
+`<service_account.json>`
+     Specifies the key in the secret you created that stores your Google Cloud secret access key. 
+
+     2. Create the `Issuer` object by running the following command: 
+
+```shell-session
+$ oc create -f issuer.yaml
+```
+
+
+## 11.7.6. Configure an ACME issuer by using ambient credentials on Google Cloud
+
+You can use the cert-manager Operator for Red Hat OpenShift to set up an ACME issuer to solve DNS-01 challenges by using ambient credentials on Google Cloud. This procedure uses _Let’s Encrypt_ as the ACME CA server and shows how to solve DNS-01 challenges with Google Cloud DNS. 
+
+**Prerequisites**
+
+  * If your cluster is configured to use Google Cloud Workload Identity, you followed the instructions from the _Configuring cloud credentials for the cert-manager Operator for Red Hat OpenShift with Google Cloud Workload Identity_ section. 
+  * If your cluster does not use Google Cloud Workload Identity, you followed the instructions from the _Configuring cloud credentials for the cert-manager Operator for Red Hat OpenShift on Google Cloud_ section. 
+
+
+
+**Procedure**
+
+  1. Optional: Override the name server settings for the DNS-01 self check. 
+
+This step is required only when the target public-hosted zone overlaps with the cluster’s default private-hosted zone. 
+
+     1. Edit the `CertManager` resource by running the following command: 
+
+```shell-session
+$ oc edit certmanager cluster
+```
+
+
+     2. Add a `spec.controllerConfig` section with the following override arguments: 
+
+```yaml
+apiVersion: operator.openshift.io/v1alpha1
+kind: CertManager
+metadata:
+  name: cluster
+  ...
+spec:
+  ...
+  controllerConfig:
+    overrideArgs:
+      - '--dns01-recursive-nameservers-only'
+      - '--dns01-recursive-nameservers=1.1.1.1:53'
+```
+
+
+where: 
+
+`--dns01-recursive-nameservers-only`
+     Specifies recursive name servers instead of checking the authoritative name servers associated with that domain. 
+`--dns01-recursive-nameservers=1.1.1.1:53`
+     Specifies a comma-separated list of `<host>:<port>` name servers to query for the DNS-01 self check. You must use a `1.1.1.1:53` value to avoid the public and private zones overlapping. 
+
+     3. Save the file to apply the changes. 
+
+  2. Optional: Create a namespace for the issuer: 
+
+```shell-session
+$ oc new-project <issuer_namespace>
+```
+
+
+  3. Modify the `CertManager` resource to add the `--issuer-ambient-credentials` argument: 
+
+```shell-session
+$ oc patch certmanager/cluster \
+  --type=merge \
+  -p='{"spec":{"controllerConfig":{"overrideArgs":["--issuer-ambient-credentials"]}}}'
+```
+
+
+  4. Create an issuer: 
+
+     1. Create a YAML file that defines the `Issuer` object: 
+
+**Example`issuer.yaml` file**
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: <issuer_name>
+  namespace: <issuer_namespace>
+spec:
+  acme:
+    preferredChain: ""
+    privateKeySecretRef:
+      name: <secret_private_key>
+    server: <server>
+    solvers:
+    - dns01:
+        cloudDNS:
+          project: <gcp_project_id>
+```
+
+
+where: 
+
+`<issuer_name>`
+     Specifies a name for the issuer. 
+`<issuer_namespace>`
+     Specifies a namespace for the issuer. 
+`<secret_private_key>`
+     Specifies the name of the secret to store the ACME account private key in. 
+`<server>`
+     Specifies the URL to access the ACME server’s `directory` endpoint. This example uses the _Let’s Encrypt_ staging environment. 
+`<gcp_project_id>`
+     Specifies the name of the Google Cloud project that contains the Cloud DNS zone. 
+
+     2. Create the `Issuer` object by running the following command: 
+
+```shell-session
+$ oc create -f issuer.yaml
+```
+
+
+## 11.7.7. Configure an ACME issuer by using explicit credentials for Microsoft Azure DNS
+
+You can use cert-manager Operator for Red Hat OpenShift to set up an ACME issuer to solve DNS-01 challenges by using explicit credentials on Microsoft Azure. This procedure uses _Let’s Encrypt_ as the ACME CA server and shows how to solve DNS-01 challenges with Azure DNS. 
+
+**Prerequisites**
+
+  * You have set up a service principal with desired role for Azure DNS. 
+
+Note
+
+You can follow this procedure for an OpenShift Container Platform cluster that is not running on Microsoft Azure. 
+
+
+
+
+**Procedure**
+
+  1. Optional: Override the nameserver settings for the DNS-01 self check. 
+
+This step is required only when the target public-hosted zone overlaps with the cluster’s default private-hosted zone. 
+
+     1. Edit the `CertManager` resource by running the following command: 
+
+```shell-session
+$ oc edit certmanager cluster
+```
+
+
+     2. Add a `spec.controllerConfig` section with the following override arguments: 
+
+```yaml
+apiVersion: operator.openshift.io/v1alpha1
+kind: CertManager
+metadata:
+  name: cluster
+  ...
+spec:
+  ...
+  controllerConfig:
+    overrideArgs:
+      - '--dns01-recursive-nameservers-only'
+      - '--dns01-recursive-nameservers=1.1.1.1:53'
+```
+
+
+where: 
+
+`--dns01-recursive-nameservers-only`
+     Specifies recursive name servers instead of checking the authoritative name servers associated with that domain. 
+`--dns01-recursive-nameservers=1.1.1.1:53`
+     Specifies a comma-separated list of `<host>:<port>` name servers to query for the DNS-01 self check. You must use a `1.1.1.1:53` value to avoid the public and private zones overlapping. 
+
+     3. Save the file to apply the changes. 
+
+  2. Optional: Create a namespace for the issuer: 
+
+```shell-session
+$ oc new-project my-issuer-namespace
+```
+
+
+  3. Create a secret to store your Azure credentials in by running the following command: 
+
+```shell-session
+$ oc create secret generic <secret_name> --from-literal=<azure_secret_access_key_name>=<azure_secret_access_key_value> \
+    -n my-issuer-namespace
+```
+
+
+     * Replace `<secret_name>` with your secret name. 
+     * Replace `<azure_secret_access_key_name>` with your Azure secret access key name. 
+     * Replace `<azure_secret_access_key_value>` with your Azure secret key. 
+
+  4. Create an issuer: 
+
+     1. Create a YAML file, for example, `issuer.yaml`, that defines the `Issuer` object: 
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: <acme-dns01-azuredns-issuer>
+  namespace: <issuer_namespace>
+spec:
+  acme:
+    preferredChain: ""
+    privateKeySecretRef:
+      name: <secret_private_key>
+    server: <server>
+    solvers:
+    - dns01:
+        azureDNS:
+          clientID: <azure_client_id>
+          clientSecretSecretRef:
+            name: <secret_name>
+            key: <azure_secret_access_key_name>
+          subscriptionID: <azure_subscription_id>
+          tenantID: <azure_tenant_id>
+          resourceGroupName: <azure_dns_zone_resource_group>
+          hostedZoneName: <azure_dns_zone>
+          environment: AzurePublicCloud
+```
+
+
+where: 
+
+`<acme-dns01-azuredns-issuer>`
+     Specifies a name for the issuer. 
+`<issuer_namespace>`
+     Specifies your issuer namespace. 
+`<secret_private_key>`
+     Specifies the name of the secret to store the ACME account private key in. 
+`<server>`
+     Specifies the URL to access the ACME server’s `directory` endpoint. This example uses the _Let’s Encrypt_ staging environment. 
+`<azure_client_id>`
+     Specifies your Azure client ID. 
+`<secret_name>`
+     Specifies a name of the client secret. 
+`<azure_secret_access_key_name>`
+     Specifies the client secret key name. 
+`<azure_subscription_id>`
+     Specifies your Azure subscription ID. 
+`<azure_tenant_id>`
+     Specifies your Azure tenant ID. 
+`<azure_dns_zone_resource_group>`
+     Specifies the name of the Azure DNS zone resource group. 
+`<azure_dns_zone>`
+     Specifies the name of Azure DNS zone. 
+
+     2. Create the `Issuer` object by running the following command: 
+
+```shell-session
+$ oc create -f issuer.yaml
+```
+
+
+## 11.7.8. Additional resources
+
+  * [Azure DNS](https://cert-manager.io/docs/configuration/acme/dns01/azuredns/)
+  * [Google Cloud DNS](https://cert-manager.io/docs/configuration/acme/dns01/google/)
+  * [Configuring cloud credentials for the cert-manager Operator for Red Hat OpenShift for the AWS Security Token Service cluster](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/security_and_compliance/cert-manager-operator-for-red-hat-openshift#cert-manager-configure-cloud-credentials-aws-sts_cert-manager-authenticate "11.6.2. Authenticate with AWS Security Token Service")
+  * [Configuring cloud credentials for the cert-manager Operator for Red Hat OpenShift on AWS](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/security_and_compliance/cert-manager-operator-for-red-hat-openshift#cert-manager-configure-cloud-credentials-aws-non-sts_cert-manager-authenticate "11.6.1. Authenticate on AWS")
+  * [Configuring cloud credentials for the cert-manager Operator for Red Hat OpenShift with Google Cloud Workload Identity](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/security_and_compliance/cert-manager-operator-for-red-hat-openshift#cert-manager-configure-cloud-credentials-gcp-sts_cert-manager-authenticate "11.6.4. Authenticate with Google Cloud Workload Identity")
+  * [Configuring cloud credentials for the cert-manager Operator for Red Hat OpenShift on Google Cloud](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/security_and_compliance/cert-manager-operator-for-red-hat-openshift#cert-manager-configure-cloud-credentials-gcp-non-sts_cert-manager-authenticate "11.6.3. Authenticate on Google Cloud")
+  * [HTTP01](https://cert-manager.io/docs/configuration/acme/http01/)
+  * [HTTP-01 challenge](https://letsencrypt.org/docs/challenge-types/#http-01-challenge)
+  * [DNS01](https://cert-manager.io/docs/configuration/acme/dns01/)

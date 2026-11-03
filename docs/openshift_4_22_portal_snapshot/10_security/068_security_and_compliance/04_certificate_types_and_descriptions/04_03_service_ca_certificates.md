@@ -1,0 +1,64 @@
+# 4.3. Service CA certificates
+
+Review service certificate authority (CA) certificate rotation, expiration, and Operator-managed signing in OpenShift Container Platform to plan maintenance for internal service serving certificates. 
+
+## 4.3.1. Purpose
+
+`service-ca` is an Operator that creates a self-signed CA when an OpenShift Container Platform cluster is deployed. 
+
+## 4.3.2. Expiration
+
+A custom expiration term is not supported. The self-signed CA is stored in the `service-ca/signing-key` secret. The certificate is in `tls.crt`, the private key is in `tls.key`, and the CA bundle is in `ca-bundle.crt`. 
+
+Other services can request a service serving certificate by annotating a service resource with `service.beta.openshift.io/serving-cert-secret-name: <secret name>`. In response, the Operator generates a new certificate as `tls.crt`, and a private key as `tls.key`, in the named secret. The certificate is valid for two years. 
+
+Other services can request that the CA bundle for the service CA be injected into API service or config map resources by annotating with `service.beta.openshift.io/inject-cabundle: true` to support validating certificates generated from the service CA. In response, the Operator writes the current CA bundle to the `CABundle` field of an API service or as `service-ca.crt` to a config map. 
+
+As of OpenShift Container Platform 4.3.5, automated rotation is supported and is backported to some 4.2.z and 4.3.z releases. For any release supporting automated rotation, the service CA is valid for 26 months and is automatically refreshed when there is less than 13 months validity left. If necessary, you can manually refresh the service CA. 
+
+The 26-month service CA validity period is longer than the expected upgrade interval for a supported OpenShift Container Platform cluster. Non-control plane consumers of service CA certificates are refreshed after CA rotation and before the expiration of the pre-rotation CA. 
+
+Warning
+
+A manually-rotated service CA does not maintain trust with the previous service CA. You might experience a temporary service disruption until the pods in the cluster are restarted, which ensures that pods are using service serving certificates issued by the new service CA. 
+
+Important
+
+Applications using the `service-ca` certificate must be capable of dynamically reloading CA certificates. When automated rotation occurs, pods that cannot reload CA certificates dynamically might require a restart to rebuild certificate trust. 
+
+## 4.3.3. Management
+
+These certificates are managed by the system and not the user. 
+
+## 4.3.4. Services
+
+Services that use service CA certificates include: 
+
+  * `cluster-autoscaler-operator`
+  * `cluster-monitoring-operator`
+  * `cluster-authentication-operator`
+  * `cluster-image-registry-operator`
+  * `cluster-ingress-operator`
+  * `cluster-kube-apiserver-operator`
+  * `cluster-kube-controller-manager-operator`
+  * `cluster-kube-scheduler-operator`
+  * `cluster-networking-operator`
+  * `cluster-openshift-apiserver-operator`
+  * `cluster-openshift-controller-manager-operator`
+  * `cluster-samples-operator`
+  * `cluster-storage-operator`
+  * `machine-config-operator`
+  * `console-operator`
+  * `insights-operator`
+  * `machine-api-operator`
+  * `operator-lifecycle-manager`
+  * CSI driver operators 
+
+
+
+This is not a comprehensive list. 
+
+## 4.3.5. Additional resources
+
+  * [Manually rotate the service CA certificate](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/security_and_compliance/configuring-certificates#manually-rotate-service-ca_service-serving-certificate "3.3.9. Manually rotate the service CA certificate")
+  * [Securing service traffic using service serving certificate secrets](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/security_and_compliance/configuring-certificates#add-service-serving "3.3. Securing service traffic using service serving certificate secrets")

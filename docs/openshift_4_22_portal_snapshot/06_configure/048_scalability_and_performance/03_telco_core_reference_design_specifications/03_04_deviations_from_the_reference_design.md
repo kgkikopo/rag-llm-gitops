@@ -1,0 +1,19 @@
+# 3.4. Deviations from the reference design
+
+Deviating from the validated telco core, telco RAN DU, and telco hub reference design specifications (RDS) can have significant impact beyond the specific component or feature that you change. Deviations require analysis and engineering in the context of the complete solution. 
+
+Important
+
+All deviations from the RDS should be analyzed and documented with clear action tracking information. Due diligence is expected from partners to understand how to bring deviations into line with the reference design. This might require partners to provide additional resources to engage with Red Hat to work towards enabling their use case to achieve a best in class outcome with the platform. This is critical for the supportability of the solution and ensuring alignment across Red Hat and with partners. 
+
+Deviation from the RDS can have some or all of the following consequences: 
+
+  * It can take longer to resolve issues. 
+  * There is a risk of missing project service-level agreements (SLAs), project deadlines, end provider performance requirements, and so on. 
+  * Unapproved deviations may require escalation at executive levels. 
+
+
+
+Note
+
+Red Hat prioritizes the servicing of requests for deviations based on partner engagement priorities.

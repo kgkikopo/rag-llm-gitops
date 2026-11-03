@@ -1,0 +1,822 @@
+# 4.6. Deploying hosted control planes on IBM Z
+
+You can deploy hosted control planes on IBM Z by configuring a cluster to function as a management cluster. The management cluster is the OpenShift Container Platform cluster where the control planes are hosted. The management cluster is also known as the _hosting_ cluster. 
+
+Note
+
+The _management_ cluster is not the _managed_ cluster. A managed cluster is a cluster that the hub cluster manages. The _management_ cluster can run on either the x86_64 architecture, supported beginning with OpenShift Container Platform 4.17 and multicluster engine for Kubernetes Operator 2.7, or the s390x architecture, supported beginning with OpenShift Container Platform 4.20 and multicluster engine for Kubernetes Operator 2.10. 
+
+You can convert a managed cluster to a management cluster by using the `hypershift` add-on to deploy the HyperShift Operator on that cluster. Then, you can start to create the hosted cluster. 
+
+The multicluster engine Operator supports only the default `local-cluster`, which is a hub cluster that is managed, and the hub cluster as the management cluster. 
+
+To provision hosted control planes on bare metal, you can use the Agent platform. The Agent platform uses the central infrastructure management service to add worker nodes to a hosted cluster. For more information, see "Enabling the central infrastructure management service". 
+
+Each IBM Z system host must be started with the PXE or ISO images that are provided by the central infrastructure management. After each host starts, it runs an Agent process to discover the details of the host and completes the installation. An Agent custom resource represents each host. 
+
+When you create a hosted cluster with the Agent platform, HyperShift Operator installs the Agent Cluster API provider in the hosted control plane namespace. 
+
+## 4.6.1. Prerequisites to configure hosted control planes on IBM Z
+
+Ensure you meet the prerequisites to configure hosted control planes on IBM Z. 
+
+  * The multicluster engine for Kubernetes Operator version 2.7 or later must be installed on an OpenShift Container Platform cluster. You can install multicluster engine Operator as an Operator from the OpenShift Container Platform OperatorHub. 
+  * The multicluster engine Operator must have at least one managed OpenShift Container Platform cluster. The `local-cluster` is automatically imported in multicluster engine Operator 2.7 and later. For more information about the `local-cluster`, see _Advanced configuration_ in the Red Hat Advanced Cluster Management documentation. You can check the status of your hub cluster by running the following command: 
+
+```shell-session
+$ oc get managedclusters local-cluster
+```
+
+
+  * You need a hosting cluster with at least three worker nodes to run the HyperShift Operator. 
+  * You need to enable the central infrastructure management service. For more information, see "Enabling the central infrastructure management service". 
+  * You need to install the hosted control plane command-line interface. For more information, see "Installing the hosted control plane command-line interface". 
+
+
+
+Note
+
+The _management_ cluster can run on either the x86_64 architecture, supported beginning with OpenShift Container Platform 4.17 and multicluster engine for Kubernetes Operator 2.7, or the s390x architecture, supported beginning with OpenShift Container Platform 4.20 and multicluster engine for Kubernetes Operator 2.10. 
+
+**Additional resources**
+
+  * [Advanced configuration](https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/latest/html/clusters/cluster_mce_overview#advanced-config-engine)
+  * [Enabling the central infrastructure management service](https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/latest/html/clusters/cluster_mce_overview#enable-cim)
+  * [Installing the hosted control planes command-line interface](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/hosted_control_planes/preparing-to-deploy-hosted-control-planes#hcp-cli-terminal_hcp-cli "3.4.1. Installing the hosted control planes command-line interface from the terminal")
+
+
+
+## 4.6.2. IBM Z infrastructure requirements
+
+The Agent platform does not create any infrastructure, but requires several resources for infrastructure. 
+
+  * Agents: An _Agent_ represents a host that is booted with a discovery image, or PXE image and is ready to be provisioned as an OpenShift Container Platform node. 
+  * DNS: The API and Ingress endpoints must be routable. 
+
+
+
+The hosted control planes feature is enabled by default. If you disabled the feature and want to manually enable it, or if you need to disable the feature, see "Enabling or disabling the hosted control planes feature". 
+
+## 4.6.3. DNS configuration for hosted control planes on IBM Z
+
+The API server for the hosted cluster is exposed as a `NodePort` service. A DNS entry must exist for the `api.<hosted_cluster_name>.<base_domain>` that points to the destination where the API server is reachable. 
+
+The DNS entry can be as simple as a record that points to one of the nodes in the managed cluster that is running the hosted control plane. 
+
+The entry can also point to a load balancer deployed to redirect incoming traffic to the Ingress pods. 
+
+See the following example of a DNS configuration: 
+
+```shell-session
+$ cat /var/named/<example.krnl.es.zone>
+```
+
+
+**Example output**
+
+```shell-session
+$ TTL 900
+@ IN  SOA bastion.example.krnl.es.com. hostmaster.example.krnl.es.com. (
+      2019062002
+      1D 1H 1W 3H )
+  IN NS bastion.example.krnl.es.com.
+;
+;
+api                   IN A 1xx.2x.2xx.1xx
+api-int               IN A 1xx.2x.2xx.1xx
+;
+;
+*.apps        IN A 1xx.2x.2xx.1xx
+;
+;EOF
+```
+
+
+The `api` record refers to the IP address of the API load balancer that handles ingress and egress traffic for hosted control planes. 
+
+For IBM z/VM, add IP addresses that correspond to the IP address of the agent. 
+
+```shell-session
+compute-0              IN A 1xx.2x.2xx.1yy
+compute-1              IN A 1xx.2x.2xx.1yy
+```
+
+
+### 4.6.3.1. Defining a custom DNS name
+
+As a cluster administrator, you can create a hosted cluster with an external API DNS name that differs from the internal endpoint that gets used for node bootstraps and control plane communication. 
+
+You might want to define a different DNS name for the following reasons: 
+
+  * To replace the user-facing TLS certificate with one from a public CA without breaking the control plane functions that bind to the internal root CA 
+  * To support split-horizon DNS and NAT scenarios 
+  * To ensure a similar experience to standalone control planes, where you can use functions, such as the `Show Login Command` function, with the correct `kubeconfig` and DNS configuration 
+
+
+
+You can define a DNS name either during your initial setup or during postinstallation operations, by entering a domain name in the `kubeAPIServerDNSName` parameter of a `HostedCluster` object. 
+
+**Prerequisites**
+
+  * You have a valid TLS certificate that covers the DNS name that you set in the `kubeAPIServerDNSName` parameter. 
+  * You have a resolvable DNS name URI that can reach and point to the correct address. 
+
+
+
+**Procedure**
+
+  * In the specification for the `HostedCluster` object, add the `kubeAPIServerDNSName` parameter and the address for the domain and specify which certificate to use, as shown in the following example: 
+
+```yaml
+#...
+spec:
+  configuration:
+    apiServer:
+      servingCerts:
+        namedCertificates:
+        - names:
+          - xxx.example.com
+          - yyy.example.com
+          servingCertificate:
+            name: <my_serving_certificate>
+  kubeAPIServerDNSName: <custom_address>
+```
+
+
+The value for the `kubeAPIServerDNSName` parameter must be a valid and addressable domain. 
+
+After you define the `kubeAPIServerDNSName` parameter and specify the certificate, the Control Plane Operator controllers create a `kubeconfig` file named `custom-admin-kubeconfig`, where the file gets stored in the `HostedControlPlane` namespace. The generation of certificates happen from the root CA, and the `HostedControlPlane` namespace manages their expiration and renewal. 
+
+The Control Plane Operator reports a new `kubeconfig` file named `CustomKubeconfig` in the `HostedControlPlane` namespace. That file uses the defined new server in the `kubeAPIServerDNSName` parameter. 
+
+A reference for the custom `kubeconfig` file exists in the `status` parameter as `CustomKubeconfig` of the `HostedCluster` object. The `CustomKubeConfig` parameter is optional, and you can add the parameter only if the `kubeAPIServerDNSName` parameter is not empty. After you set the `CustomKubeConfig` parameter, the parameter triggers the generation of a secret named `<hosted_cluster_name>-custom-admin-kubeconfig` in the `HostedCluster` namespace. You can use the secret to access the `HostedCluster` API server. If you remove the `CustomKubeConfig` parameter during postinstallation operations, deletion of all related secrets and status references occur. 
+
+Note
+
+Defining a custom DNS name does not directly impact the data plane, so no expected rollouts occur. The `HostedControlPlane` namespace receives the changes from the HyperShift Operator and deletes the corresponding parameters. 
+
+If you remove the `kubeAPIServerDNSName` parameter from the specification for the `HostedCluster` object, all newly generated secrets and the `CustomKubeconfig` reference are removed from the cluster and from the `status` parameter. 
+
+
+
+
+## 4.6.4. Creating a hosted cluster on bare metal for IBM Z
+
+On bare-metal infrastructure, after you enable the Assisted Installer as an add-on to multicluster engine Operator and create a hosted cluster with the Agent platform, the HyperShift Operator installs the Agent Cluster API provider in the hosted control plane namespace. 
+
+The Agent Cluster API provider connects a management cluster that hosts the control plane and a hosted cluster that consists of only the compute nodes. 
+
+**Prerequisites**
+
+  * Each hosted cluster must have a cluster-wide unique name. A hosted cluster name cannot be the same as any existing managed cluster. Otherwise, the multicluster engine Operator cannot manage the hosted cluster. 
+  * Do not use the word `clusters` as a hosted cluster name. 
+  * You cannot create a hosted cluster in the namespace of a multicluster engine Operator managed cluster. 
+  * For best security and management practices, create a hosted cluster separate from other hosted clusters. 
+  * Verify that you have a default storage class configured for your cluster. Otherwise, you might see pending persistent volume claims (PVCs). 
+
+
+
+**Procedure**
+
+  1. Create a namespace by entering the following command: 
+
+```shell-session
+$ oc create ns <hosted_cluster_namespace>
+```
+
+
+Replace `<hosted_cluster_namespace>` with an identifier for your hosted cluster namespace. The HyperShift Operator creates the namespace. During the hosted cluster creation process on bare-metal infrastructure, a generated Cluster API provider role requires that the namespace already exists. 
+
+  2. Create the configuration file for your hosted cluster by entering the following command: 
+
+```shell-session
+$ hcp create cluster agent \
+  --name=<hosted_cluster_name> \
+  --pull-secret=<path_to_pull_secret> \
+  --agent-namespace=<hosted_control_plane_namespace> \
+  --base-domain=<base_domain> \
+  --api-server-address=api.<hosted_cluster_name>.<base_domain> \
+  --etcd-storage-class=<etcd_storage_class> \
+  --ssh-key=<path_to_ssh_key> \
+  --namespace=<hosted_cluster_namespace> \
+  --control-plane-availability-policy=HighlyAvailable \
+  --release-image=quay.io/openshift-release-dev/ocp-release:<ocp_release_image>-multi \
+  --node-pool-replicas=<node_pool_replica_count> \
+  --disable-cluster-capabilities=<capability> \
+  --enable-cluster-capabilities=<capability> \
+  --render \
+  --render-sensitive  > hosted-cluster-config.yaml
+```
+
+
+where: 
+
+     * `--name` specifies the name of your hosted cluster, such as `example`. 
+     * `--pull-secret` specifies the path to your pull secret, such as `/user/name/pullsecret`. 
+     * `--agent-namespace` specifies your hosted control plane namespace, such as `clusters-example`. Ensure that agents are available in this namespace by using the `oc get agent -n <hosted_control_plane_namespace>` command. 
+     * `--base-domain` specifies your base domain, such as `krnl.es`. 
+     * `--api-server-address` specifies the IP address that gets used for the Kubernetes API communication in the hosted cluster. If you do not set the `--api-server-address` flag, you must log in to connect to the management cluster. 
+     * `--etcd-storage-class` specifies the etcd storage class name, such as `lvm-storageclass`. 
+     * `--ssh-key` specifies the path to your SSH public key. The default file path is `~/.ssh/id_rsa.pub`. 
+     * `--namespace` specifies your hosted cluster namespace. 
+     * `--control-plane-availability-policy` specifies the availability policy for the hosted control plane components. Supported options are `SingleReplica` and `HighlyAvailable`. The default value is `HighlyAvailable`. 
+     * `--release-image` specifies the supported OpenShift Container Platform version that you want to use, such as `4.22.0-multi`. If you are using a disconnected environment, replace `<ocp_release_image>` with the digest image. To extract the OpenShift Container Platform release image digest, see "Extracting the release image digest". 
+     * `--node-pool-replicas` specifies the node pool replica count, such as `3`. You must specify the replica count as `0` or greater to create the same number of replicas. Otherwise, you do not create node pools. 
+     * `--disable-cluster-capabilities` specifies that you want to disable optional capabilities in the hosted cluster. This flag is optional. For more information, see "Capabilities for hosted clusters". 
+     * `--enable-cluster-capabilities` specifies that you want to enable optional capabilities in the hosted cluster. This flag is optional. For more information, see "Capabilities for hosted clusters". 
+
+  3. Apply the changes to the hosted cluster configuration file by entering the following command: 
+
+```shell-session
+$ oc apply -f hosted_cluster_config.yaml
+```
+
+
+  4. Check for the creation of the hosted cluster, node pools, and pods by entering the following commands: 
+
+```shell-session
+$ oc get hostedcluster \
+  <hosted_cluster_name> -n \
+  <hosted_cluster_namespace> -o \
+  jsonpath='{.status.conditions[?(@.status=="False")]}' | jq .
+```
+
+
+```shell-session
+$ oc get hostedcluster \
+  <nodepool_name> -n \
+  <hosted_cluster_namespace> -o \
+  jsonpath='{.status.conditions[?(@.status=="False")]}' | jq .
+```
+
+
+```shell-session
+$ oc get pods -n <hosted_control_plane_namespace>
+```
+
+
+  5. Confirm that the hosted cluster is ready. The status of `Available: True` indicates the readiness of the control plane. 
+
+
+
+**Additional resources**
+
+  * [Manually importing a hosted cluster](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/hosted_control_planes/hcp-import "Chapter 17. Manually importing a hosted cluster")
+  * [Extracting the release image digest](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/hosted_control_planes/deploying-hosted-control-planes-in-a-disconnected-environment#hcp-dc-extract_hcp-deploy-dc-bm "6.3.3. Extracting the release image digest")
+  * [Creating a hosted cluster on bare metal by using the console](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/hosted_control_planes/deploying-hosted-control-planes#hcp-bm-hc-console_hcp-deploy-bm "4.3.6.2. Creating a hosted cluster on bare metal by using the console")
+
+
+
+## 4.6.5. Capabilities for hosted clusters
+
+To reduce resource consumption and prevent unnecessary Operators and operands from being deployed, administrators can enable or disable optional OpenShift Container Platform components when they create a hosted cluster. 
+
+When capabilities are not specified on a `HostedCluster` resource, the cluster uses the OpenShift Container Platform version’s `DefaultCapabilitySet` settings, excluding the `baremetal` capability. As a result, most optional components are enabled by default. 
+
+Important
+
+Capabilities are immutable after cluster creation. You cannot change them after you create the `HostedCluster` resource. 
+
+### 4.6.5.1. Capabilities that you can enable or disable for a hosted cluster
+
+Familiarize yourself with the supported capabilities that you can enable or disable for a `HostedCluster` resource. 
+
+The capabilities are described in the following table: 
+
+Capability| Description  
+---|---  
+`ImageRegistry` |  The OpenShift Image Registry Operator and its operands, including cloud storage infrastructure, such as S3 buckets and Identity and Access Management (IAM) users.   
+`openshift-samples` |  The OpenShift Samples Operator, which manages example `ImageStreams` and templates.   
+`Insights` |  The Insights Operator, which collects and uploads cluster telemetry data.   
+`baremetal` |  The Bare Metal Infrastructure Operator. This capability is excluded from the default set. If needed, you must explicitly enable it.   
+`Console` |  The OpenShift Web Console Operator and its operands.   
+`NodeTuning` |  The Node Tuning Operator, which manages node-level performance tuning by using TuneD and performance profiles.   
+`Ingress` |  The OpenShift Ingress Operator, which manages the default router of the cluster.   
+Show more
+
+The following rules apply when you combine capability settings: 
+
+No overlap
+     A capability cannot be in both the `enabled` and `disabled` lists simultaneously. 
+Console requires Ingress
+     You can disable the `Ingress` capability only if the `Console` capability is also disabled because the console depends on Ingress. 
+Version requirement
+     You must use OpenShift Container Platform 4.20 or later to disable any of the following capabilities: `openshift-samples`, `Insights`, `Console`, `NodeTuning`, and `Ingress`. You can disable `ImageRegistry` and `baremetal` on versions earlier than 4.20. 
+Bare metal default exclusion
+     The `baremetal` capability is excluded from the default set. You can add it to the cluster by explicitly enabling it. 
+
+### 4.6.5.2. Setting capabilities for a hosted cluster
+
+To reduce unnecessary resource consumption, you can control which optional capabilities are enabled for a hosted cluster when you create the cluster. 
+
+Important
+
+Capabilities are immutable after cluster creation. You cannot change them after you create the `HostedCluster` resource. 
+
+You can specify which capabilities are enabled by either using the `hcp` command-line interface (CLI) or by setting the `HostedCluster` manifest. 
+
+**Procedure**
+
+  * To specify which capabilities are enabled in a hosted cluster by using the CLI, you can add the `--disable-cluster-capabilities` flag, the `--enable-cluster-capabilities` flag, or both. The following example shows how to disable the `ImageRegistry`, `Console`, and `Ingress` capabilities and enable the `baremetal` capability while you create a hosted cluster on AWS by using the `hcp` command-line interface: 
+
+```shell-session
+$ hcp create cluster aws \
+    --name my-hosted-cluster \
+    --disable-cluster-capabilities=ImageRegistry,Console,Ingress \
+    --enable-cluster-capabilities=baremetal
+```
+
+
+You can specify multiple capabilities as a comma-separated list. The supported values are as follows: 
+
+    * `ImageRegistry`
+    * `openshift-samples`
+    * `Insights`
+    * `baremetal`
+    * `Console`
+    * `NodeTuning`
+    * `Ingress`
+
+  * To specify which capabilities are enabled in a hosted cluster by using the `HostedCluster` manifest at cluster creation time, see the following examples: 
+
+    * To directly disable capabilities in a hosted cluster, add the `spec.capabilities.disabled` section in the `HostedCluster` resource: 
+
+```yaml
+apiVersion: hypershift.openshift.io/v1beta1
+kind: HostedCluster
+metadata:
+  name: my-hosted-cluster
+  namespace: my-cluster-namespace
+spec:
+  capabilities:
+    disabled:
+      - ImageRegistry
+      - Console
+      - Ingress
+  # ...
+```
+
+
+    * To explicitly enable a capability that is not part of the default set of capabilities, such as the `baremetal` capability, see the following example: 
+
+```yaml
+apiVersion: hypershift.openshift.io/v1beta1
+kind: HostedCluster
+metadata:
+  name: my-hosted-cluster
+  namespace: my-cluster-namespace
+spec:
+  capabilities:
+    enabled:
+      - baremetal
+  # ...
+```
+
+
+    * You can use both `enabled` and `disabled` if no capabilities are in both lists. See the following example: 
+
+```yaml
+apiVersion: hypershift.openshift.io/v1beta1
+kind: HostedCluster
+metadata:
+  name: my-hosted-cluster
+  namespace: my-cluster-namespace
+spec:
+  capabilities:
+    enabled:
+      - baremetal
+    disabled:
+      - ImageRegistry
+      - openshift-samples
+  # ...
+```
+
+
+## 4.6.6. Creating an InfraEnv resource for hosted control planes on IBM Z
+
+Before you can create a hosted cluster, you need an `InfraEnv` resource, which is the environment where hosts that are booted with PXE images can join as agents. In this case, the agents are created in the same namespace as your hosted control plane. 
+
+**Procedure**
+
+  1. Create a YAML file to contain the configuration. See the following example: 
+
+```yaml
+apiVersion: agent-install.openshift.io/v1beta1
+kind: InfraEnv
+metadata:
+  name: <hosted_cluster_name>
+  namespace: <hosted_control_plane_namespace>
+spec:
+  cpuArchitecture: s390x
+  pullSecretRef:
+    name: pull-secret
+  sshAuthorizedKey: <ssh_public_key>
+```
+
+
+  2. Save the file as `infraenv-config.yaml`. 
+  3. Apply the configuration by entering the following command: 
+
+```shell-session
+$ oc apply -f infraenv-config.yaml
+```
+
+
+  4. To fetch the URL to download the PXE or ISO images, such as, `initrd.img`, `kernel.img`, or `rootfs.img`, which allows IBM Z machines to join as agents, enter the following command: 
+
+```shell-session
+$ oc -n <hosted_control_plane_namespace> get InfraEnv <hosted_cluster_name> -o json
+```
+
+
+## 4.6.7. Adding IBM Z KVM as agents
+
+To attach compute nodes to a hosted control plane, create agents that help you to scale the node pool. 
+
+Adding agents in an IBM Z environment requires additional steps, which are described in detail in this section. 
+
+Unless stated otherwise, this procedure applies to both z/VM and RHEL KVM installations on IBM Z and IBM LinuxONE. 
+
+For IBM Z with KVM, run the following command to start your IBM Z environment with the downloaded PXE images from the `InfraEnv` resource. After the Agents are created, the host communicates with the Assisted Service and registers in the same namespace as the `InfraEnv` resource on the management cluster. 
+
+**Procedure**
+
+  1. Run the following command: 
+
+```shell-session
+virt-install \
+   --name "<vm_name>" \
+   --autostart \
+   --ram=16384 \
+   --cpu host \
+   --vcpus=4 \
+   --location "<path_to_kernel_initrd_image>,kernel=kernel.img,initrd=initrd.img" \
+   --disk <qcow_image_path> \
+   --network network:macvtap-net,mac=<mac_address> \
+   --graphics none \
+   --noautoconsole \
+   --wait=-1
+   --extra-args "rd.neednet=1 nameserver=<nameserver>   coreos.live.rootfs_url=http://<http_server>/rootfs.img random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal console=tty1 console=ttyS1,115200n8 coreos.inst.persistent-kargs=console=tty1 console=ttyS1,115200n8"
+```
+
+
+     * `--name` specifies the name of the virtual machine. 
+     * `--location` specifies the location of the `kernel_initrd_image` file. 
+     * `--disk` specifies the disk image path. 
+     * `--network` specifies the Mac address. 
+     * `--extra-args` specifies the server name of the agents. 
+
+  2. For ISO boot, download ISO from the `InfraEnv` resource and boot the nodes by running the following command: 
+
+```shell-session
+virt-install \
+  --name "<vm_name>" \
+  --autostart \
+  --memory=16384 \
+  --cpu host \
+  --vcpus=4 \
+  --network network:macvtap-net,mac=<mac_address> \
+  --cdrom "<path_to_image.iso>" \
+  --disk <qcow_image_path> \
+  --graphics none \
+  --noautoconsole \
+  --os-variant <os_version> \
+  --wait=-1
+```
+
+
+     * `--name` specifies the name of the virtual machine. 
+     * `--network` specifies the Mac address. 
+     * `--cdrom` specifies the location of the `image.iso` file. 
+     * `--os-variant` specifies the operating system version that you are using. 
+
+
+
+
+## 4.6.8. Adding IBM Z LPAR as agents
+
+To attach compute nodes to a hosted control plane, create agents that help you to scale the node pool. 
+
+Adding agents in an IBM Z environment requires additional steps, which are described in detail in this section. 
+
+Unless stated otherwise, this procedure applies to both z/VM and RHEL KVM installations on IBM Z and IBM LinuxONE. 
+
+You can add the Logical Partition (LPAR) on IBM Z or IBM LinuxONE as a compute node to a hosted control plane. 
+
+**Procedure**
+
+  1. Create a boot parameter file for the agents: 
+
+**Example parameter file**
+
+```yaml
+rd.neednet=1 cio_ignore=all,!condev \
+console=ttysclp0 \
+ignition.firstboot ignition.platform.id=metal
+coreos.live.rootfs_url=http://<http_server>/rhcos-<version>-live-rootfs.<architecture>.img \
+coreos.inst.persistent-kargs=console=ttysclp0
+ip=<ip>::<gateway>:<netmask>::<interface>:none nameserver=<dns> \
+rd.znet=qeth,<network_adaptor_range>,layer2=1
+rd.<disk_type>=<adapter> \
+zfcp.allow_lun_scan=0
+ai.ip_cfg_override=1 \
+random.trust_cpu=on rd.luks.options=discard
+```
+
+
+where: 
+
+`coreos.live.rootfs_url`
+     For the `coreos.live.rootfs_url` artifact, specify the matching `rootfs` artifact for the `kernel` and `initramfs` that you are starting. Only HTTP and HTTPS protocols are supported. 
+`ip`
+     For the `ip` parameter, manually assign the IP address, as described in "Installing a cluster with z/VM on IBM Z and IBM LinuxONE". 
+`rd`
+     For installations on DASD-type disks, use `rd.dasd` to specify the DASD where Red Hat Enterprise Linux CoreOS (RHCOS) is to be installed. For installations on FCP-type disks, use `rd.zfcp=<adapter>,<wwpn>,<lun>` to specify the FCP disk where RHCOS is to be installed. 
+`ai.ip_cfg_override`
+     Specify this parameter when you use an Open Systems Adapter (OSA) or HiperSockets. 
+
+  2. Download the `.ins` and `initrd.img.addrsize` files from the `InfraEnv` resource. 
+
+By default, the URL for the `.ins` and `initrd.img.addrsize` files is not available in the `InfraEnv` resource. You must edit the URL to fetch those artifacts. 
+
+     1. Update the kernel URL endpoint to include `ins-file` by running the followign command: 
+
+```shell-session
+$ curl -k -L -o generic.ins "< url for ins-file >"
+```
+
+
+**Example URL**
+
+```yaml
+https://…/boot-artifacts/ins-file?arch=s390x&version=4.17.0
+```
+
+
+     2. Update the `initrd` URL endpoint to include `s390x-initrd-addrsize`: 
+
+**Example URL**
+
+```yaml
+https://…./s390x-initrd-addrsize?api_key=<api-key>&arch=s390x&version=4.17.0
+```
+
+
+  3. Transfer the `initrd`, `kernel`, `generic.ins`, and `initrd.img.addrsize` parameter files to the file server. For more information about how to transfer the files with FTP and boot, see "Installing in an LPAR". 
+  4. Start the machine. 
+  5. Repeat the procedure for all other machines in the cluster. 
+
+
+
+**Additional resources**
+
+  * [Installing in an LPAR](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/8/html/performing_a_standard_rhel_8_installation/installing-in-an-lpar_installing-rhel)
+
+
+
+### 4.6.8.1. Adding IBM z/VM as agents
+
+If you want to use a static IP for z/VM guest, you must configure the `NMStateConfig` attribute for the z/VM agent so that the IP parameter persists in the second start. 
+
+Complete the following steps to start your IBM Z environment with the downloaded PXE images from the `InfraEnv` resource. After the Agents are created, the host communicates with the Assisted Service and registers in the same namespace as the `InfraEnv` resource on the management cluster. 
+
+**Procedure**
+
+  1. Update the parameter file to add the `rootfs_url`, `network_adaptor` and `disk_type` values. 
+
+**Example parameter file**
+
+```yaml
+rd.neednet=1 cio_ignore=all,!condev \
+console=ttysclp0  \
+ignition.firstboot ignition.platform.id=metal \
+coreos.live.rootfs_url=http://<http_server>/rhcos-<version>-live-rootfs.<architecture>.img \
+coreos.inst.persistent-kargs=console=ttysclp0
+ip=<ip>::<gateway>:<netmask>::<interface>:none nameserver=<dns> \
+rd.znet=qeth,<network_adaptor_range>,layer2=1
+rd.<disk_type>=<adapter> \
+zfcp.allow_lun_scan=0
+ai.ip_cfg_override=1 \
+```
+
+
+where: 
+
+`coreos.live.rootfs_url`
+     For the `coreos.live.rootfs_url` artifact, specify the matching `rootfs` artifact for the `kernel` and `initramfs` that you are starting. Only HTTP and HTTPS protocols are supported. 
+`ip`
+     For the `ip` parameter, manually assign the IP address, as described in "Installing a cluster with z/VM on IBM Z and IBM LinuxONE". 
+`rd`
+    
+
+For installations on DASD-type disks, use `rd.dasd` to specify the DASD where Red Hat Enterprise Linux CoreOS (RHCOS) is to be installed. For installations on FCP-type disks, use `rd.zfcp=<adapter>,<wwpn>,<lun>` to specify the FCP disk where RHCOS is to be installed. 
+
+Note
+
+For FCP multipath configurations, provide two disks instead of one. 
+
+**Example**
+
+```yaml
+rd.zfcp=<adapter1>,<wwpn1>,<lun1> \
+rd.zfcp=<adapter2>,<wwpn2>,<lun2>
+```
+
+
+`ai.ip_cfg_override`
+     Specify this parameter when you use an Open Systems Adapter (OSA) or HiperSockets. 
+
+  2. Move `initrd`, kernel images, and the parameter file to the guest VM by running the following commands: 
+
+```shell-session
+vmur pun -r -u -N kernel.img $INSTALLERKERNELLOCATION/<image name>
+```
+
+
+```shell-session
+vmur pun -r -u -N generic.parm $PARMFILELOCATION/paramfilename
+```
+
+
+```shell-session
+vmur pun -r -u -N initrd.img $INSTALLERINITRAMFSLOCATION/<image name>
+```
+
+
+  3. Run the following command from the guest VM console: 
+
+```shell-session
+cp ipl c
+```
+
+
+  4. To list the agents and their properties, enter the following command: 
+
+```shell-session
+$ oc -n <hosted_control_plane_namespace> get agents
+```
+
+
+**Example output**
+
+```shell-session
+NAME    CLUSTER APPROVED    ROLE    STAGE
+50c23cda-cedc-9bbd-bcf1-9b3a5c75804d    auto-assign
+5e498cd3-542c-e54f-0c58-ed43e28b568a    auto-assign
+```
+
+
+  5. Run the following command to approve the agent. 
+
+```shell-session
+$ oc -n <hosted_control_plane_namespace> patch agent \
+  50c23cda-cedc-9bbd-bcf1-9b3a5c75804d -p \
+  '{"spec":{"installation_disk_id":"/dev/sda","approved":true,"hostname":"worker-zvm-0.hostedn.example.com"}}' \
+  --type merge
+```
+
+
+Optionally, you can set the agent ID `<installation_disk_id>` and `<hostname>` in the specification. 
+
+  6. Run the following command to verify that the agents are approved: 
+
+```shell-session
+$ oc -n <hosted_control_plane_namespace> get agents
+```
+
+
+**Example output**
+
+```shell-session
+NAME                                            CLUSTER     APPROVED   ROLE          STAGE
+50c23cda-cedc-9bbd-bcf1-9b3a5c75804d             true       auto-assign
+5e498cd3-542c-e54f-0c58-ed43e28b568a             true       auto-assign
+```
+
+
+## 4.6.9. Scaling the NodePool object for a hosted cluster on IBM Z
+
+The `NodePool` object is created when you create a hosted cluster. By scaling the `NodePool` object, you can add more compute nodes to the hosted control plane. 
+
+When you scale up a node pool, a machine is created. The Cluster API provider finds an Agent that is approved, is passing validations, is not currently in use, and meets the requirements that are specified in the node pool specification. You can monitor the installation of an Agent by checking its status and conditions. 
+
+**Procedure**
+
+  1. Run the following command to scale the `NodePool` object to two nodes: 
+
+```shell-session
+$ oc -n <clusters_namespace> scale nodepool <nodepool_name> --replicas 2
+```
+
+
+The Cluster API agent provider randomly picks two agents that are then assigned to the hosted cluster. Those agents go through different states and finally join the hosted cluster as OpenShift Container Platform nodes. The agents pass through the transition phases in the following order: 
+
+     * `binding`
+     * `discovering`
+     * `insufficient`
+     * `installing`
+     * `installing-in-progress`
+     * `added-to-existing-cluster`
+
+  2. Run the following command to see the status of a specific scaled agent: 
+
+```shell-session
+$ oc -n <hosted_control_plane_namespace> get agent -o \
+  jsonpath='{range .items[*]}BMH: {@.metadata.labels.agent-install\.openshift\.io/bmh} \
+  Agent: {@.metadata.name} State: {@.status.debugInfo.state}{"\n"}{end}'
+```
+
+
+**Example output**
+
+```shell-session
+BMH: Agent: 50c23cda-cedc-9bbd-bcf1-9b3a5c75804d State: known-unbound
+BMH: Agent: 5e498cd3-542c-e54f-0c58-ed43e28b568a State: insufficient
+```
+
+
+  3. Run the following command to see the transition phases: 
+
+```shell-session
+$ oc -n <hosted_control_plane_namespace> get agent
+```
+
+
+**Example output**
+
+```shell-session
+NAME                                   CLUSTER           APPROVED       ROLE        STAGE
+50c23cda-cedc-9bbd-bcf1-9b3a5c75804d   hosted-forwarder   true          auto-assign
+5e498cd3-542c-e54f-0c58-ed43e28b568a                      true          auto-assign
+da503cf1-a347-44f2-875c-4960ddb04091   hosted-forwarder   true          auto-assign
+```
+
+
+  4. Run the following command to generate the `kubeconfig` file to access the hosted cluster: 
+
+```shell-session
+$ hcp create kubeconfig \
+  --namespace <clusters_namespace> \
+  --name <hosted_cluster_namespace> > <hosted_cluster_name>.kubeconfig
+```
+
+
+  5. After the agents reach the `added-to-existing-cluster` state, verify that you can see the OpenShift Container Platform nodes by entering the following command: 
+
+```shell-session
+$ oc --kubeconfig <hosted_cluster_name>.kubeconfig get nodes
+```
+
+
+**Example output**
+
+```shell-session
+NAME                             STATUS   ROLES    AGE      VERSION
+worker-zvm-0.hostedn.example.com Ready    worker   5m41s    v1.24.0+3882f8f
+worker-zvm-1.hostedn.example.com Ready    worker   6m3s     v1.24.0+3882f8f
+```
+
+
+Cluster Operators start to reconcile by adding workloads to the nodes. 
+
+  6. Enter the following command to verify that two machines were created when you scaled up the `NodePool` object: 
+
+```shell-session
+$ oc -n <hosted_control_plane_namespace> get machine.cluster.x-k8s.io
+```
+
+
+**Example output**
+
+```shell-session
+NAME                                CLUSTER  NODENAME PROVIDERID     PHASE     AGE   VERSION
+hosted-forwarder-79558597ff-5tbqp   hosted-forwarder-crqq5   worker-zvm-0.hostedn.example.com   agent://50c23cda-cedc-9bbd-bcf1-9b3a5c75804d   Running   41h   4.15.0
+hosted-forwarder-79558597ff-lfjfk   hosted-forwarder-crqq5   worker-zvm-1.hostedn.example.com   agent://5e498cd3-542c-e54f-0c58-ed43e28b568a   Running   41h   4.15.0
+```
+
+
+  7. Run the following command to check the cluster version: 
+
+```shell-session
+$ oc --kubeconfig <hosted_cluster_name>.kubeconfig get clusterversion,co
+```
+
+
+**Example output**
+
+```shell-session
+NAME                                         VERSION       AVAILABLE   PROGRESSING   SINCE   STATUS
+clusterversion.config.openshift.io/version   4.15.0-ec.2   True        False         40h     Cluster version is 4.15.0-ec.2
+```
+
+
+  8. Run the following command to check the cluster operator status: 
+
+```shell-session
+$ oc --kubeconfig <hosted_cluster_name>.kubeconfig get clusteroperators
+```
+
+
+For each component of your cluster, the output shows the following cluster operator statuses: `NAME`, `VERSION`, `AVAILABLE`, `PROGRESSING`, `DEGRADED`, `SINCE`, and `MESSAGE`. 
+
+For an output example, see "Initial Operator configuration".

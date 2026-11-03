@@ -1,0 +1,45 @@
+# 1.3. Configuring pod connectivity check placement
+
+As a cluster administrator, you can configure which nodes the connectivity check pods run by modifying the `network.config.openshift.io` object named `cluster`. 
+
+**Prerequisites**
+
+  * Install the OpenShift CLI (`oc`). 
+
+
+
+**Procedure**
+
+  1. Edit the connectivity check configuration by entering the following command: 
+
+```shell-session
+$ oc edit network.config.openshift.io cluster
+```
+
+
+  2. In the text editor, update the `networkDiagnostics` stanza to specify the node selectors that you want for the source and target pods. 
+  3. Save your changes and exit the text editor. 
+
+
+
+**Verification**
+
+  * Verify that the source and target pods are running on the intended nodes by entering the following command: 
+
+```shell-session
+$ oc get pods -n openshift-network-diagnostics -o wide
+```
+
+
+**Example output**
+
+```plaintext
+NAME                                    READY   STATUS    RESTARTS   AGE     IP           NODE                                        NOMINATED NODE   READINESS GATES
+network-check-source-84c69dbd6b-p8f7n   1/1     Running   0          9h      10.131.0.8   ip-10-0-40-197.us-east-2.compute.internal   <none>           <none>
+network-check-target-46pct              1/1     Running   0          9h      10.131.0.6   ip-10-0-40-197.us-east-2.compute.internal   <none>           <none>
+network-check-target-8kwgf              1/1     Running   0          9h      10.128.2.4   ip-10-0-95-74.us-east-2.compute.internal    <none>           <none>
+network-check-target-jc6n7              1/1     Running   0          9h      10.129.2.4   ip-10-0-21-151.us-east-2.compute.internal   <none>           <none>
+network-check-target-lvwnn              1/1     Running   0          9h      10.128.0.7   ip-10-0-17-129.us-east-2.compute.internal   <none>           <none>
+network-check-target-nslvj              1/1     Running   0          9h      10.130.0.7   ip-10-0-89-148.us-east-2.compute.internal   <none>           <none>
+network-check-target-z2sfx              1/1     Running   0          9h      10.129.0.4   ip-10-0-60-253.us-east-2.compute.internal   <none>           <none>
+```

@@ -1,0 +1,46 @@
+# 20.9. LokiStack rate limit errors
+
+Resolve Loki rate limit errors and prevent data loss by updating the `LokiStack` resource to increase the ingestion rate and burst limits for your network observability data streams. 
+
+A rate-limit placed on the Loki tenant can result in potential temporary loss of data and a 429 error: `Per stream rate limit exceeded (limit:xMB/sec) while attempting to ingest for stream`. You might consider having an alert set to notify you of this error. For more information, see "Creating Loki rate limit alerts for the NetObserv dashboard" in the Additional resources of this section. 
+
+You can update the LokiStack CRD with the `perStreamRateLimit` and `perStreamRateLimitBurst` specifications, as shown in the following procedure. 
+
+**Procedure**
+
+  1. Navigate to **Ecosystem** **Installed Operators** , viewing **All projects** from the **Project** dropdown. 
+  2. Look for **Loki Operator** , and select the **LokiStack** tab. 
+  3. Create or edit an existing **LokiStack** instance using the **YAML view** to add the `perStreamRateLimit` and `perStreamRateLimitBurst` specifications: 
+
+```yaml
+apiVersion: loki.grafana.com/v1
+kind: LokiStack
+metadata:
+  name: loki
+  namespace: netobserv
+spec:
+  limits:
+    global:
+      ingestion:
+        perStreamRateLimit: 6
+        perStreamRateLimitBurst: 30
+  tenants:
+    mode: openshift-network
+  managementState: Managed
+```
+
+
+where: 
+
+`spec.limits.global.ingestion.perStreamRateLimit`
+     Specifies the ingestion rate limit. The default value is `3`. 
+`spec.limits.global.ingestion.perStreamRateLimitBurst`
+     Specifies the ingestion rate limit burst. The default value is `15`. 
+
+  4. Click **Save**. 
+
+
+
+**Verification**
+
+Once you update the `perStreamRateLimit` and `perStreamRateLimitBurst` specifications, the pods in your cluster restart and the 429 rate-limit error no longer occurs.

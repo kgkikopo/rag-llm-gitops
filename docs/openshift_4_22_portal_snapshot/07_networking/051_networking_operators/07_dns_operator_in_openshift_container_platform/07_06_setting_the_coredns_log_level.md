@@ -1,0 +1,49 @@
+# 7.6. Setting the CoreDNS log level
+
+Set CoreDNS log levels to control the detail of DNS error logging. 
+
+Log levels for CoreDNS and the CoreDNS Operator are set by using different methods. You can configure the CoreDNS log level to determine the amount of detail in logged error messages. The valid values for CoreDNS log level are `Normal`, `Debug`, and `Trace`. The default `logLevel` is `Normal`. 
+
+Note
+
+The CoreDNS error log level is always enabled. The following log level settings report different error responses: 
+
+  * `logLevel`: `Normal` enables the "errors" class: `log . { class error }`. 
+  * `logLevel`: `Debug` enables the "denial" class: `log . { class denial error }`. 
+  * `logLevel`: `Trace` enables the "all" class: `log . { class all }`. 
+
+
+
+**Procedure**
+
+  * To set `logLevel` to `Debug`, enter the following command: 
+
+```shell-session
+$ oc patch dnses.operator.openshift.io/default -p '{"spec":{"logLevel":"Debug"}}' --type=merge
+```
+
+
+  * To set `logLevel` to `Trace`, enter the following command: 
+
+```shell-session
+$ oc patch dnses.operator.openshift.io/default -p '{"spec":{"logLevel":"Trace"}}' --type=merge
+```
+
+
+**Verification**
+
+  * To ensure the desired log level was set, check the config map: 
+
+```shell-session
+$ oc get configmap/dns-default -n openshift-dns -o yaml
+```
+
+
+For example, after setting the `logLevel` to `Trace`, you should see this stanza in each server block: 
+
+```yaml
+errors
+log . {
+    class all
+}
+```

@@ -1,0 +1,1439 @@
+# 5.13. Configuring OADP with OpenShift Virtualization
+
+## 5.13.1. Configuring the OpenShift API for Data Protection with OpenShift Virtualization
+
+You can install the OpenShift API for Data Protection (OADP) with OpenShift Virtualization by installing the OADP Operator and configuring a backup location. Then, you can install the Data Protection Application. 
+
+Back up and restore virtual machines by using the OpenShift API for Data Protection. 
+
+OpenShift API for Data Protection with OpenShift Virtualization supports the following backup and restore storage options: 
+
+  * Container Storage Interface (CSI) backups 
+  * Container Storage Interface (CSI) backups with DataMover 
+
+
+
+The following storage options are excluded: 
+
+  * File system backup and restore 
+  * Volume snapshot backups and restores 
+
+
+
+To install the OADP Operator in a restricted network environment, you must first disable the default software catalog sources and mirror the Operator catalog. 
+
+Important
+
+Red Hat only supports the combination of OADP versions 1.3.0 and later, and OpenShift Virtualization versions 4.14 and later. 
+
+OADP versions before 1.3.0 are not supported for back up and restore of OpenShift Virtualization. 
+
+### 5.13.1.1. Install and configure OADP with OpenShift Virtualization
+
+As a cluster administrator, you can install the OpenShift API for Data Protection (OADP) with OpenShift Virtualization by installing the OADP Operator and configuring a backup location. You can then install the Data Protection Application to back up and restore virtual machines. 
+
+Important
+
+Red Hat only supports the combination of OADP versions 1.3.0 and later, and OpenShift Virtualization versions 4.14 and later. 
+
+OADP versions before 1.3.0 are not supported for back up and restore of OpenShift Virtualization. 
+
+To install the OADP Operator in a restricted network environment, you must first disable the default software catalog sources and mirror the Operator catalog. 
+
+Note
+
+OpenShift API for Data Protection with OpenShift Virtualization supports the following backup and restore storage options: 
+
+  * Container Storage Interface (CSI) backups 
+  * Container Storage Interface (CSI) backups with DataMover 
+
+
+
+The following storage options are excluded: 
+
+  * File system backup and restore 
+  * Volume snapshot backup and restore 
+
+
+
+The latest version of the OADP Operator installs Velero 1.16. 
+
+Warning
+
+Red Hat support is limited to only the following options: 
+
+  * CSI backups 
+  * CSI backups with DataMover. 
+
+
+
+**Prerequisites**
+
+  * You have access to the cluster as a user with the `cluster-admin` role. 
+
+
+
+**Procedure**
+
+  1. Install the OADP Operator according to the instructions for your storage provider. 
+  2. Install the Data Protection Application (DPA) with the `kubevirt` and `openshift` OADP plug-ins. 
+  3. Back up virtual machines by creating a `Backup` custom resource (CR). 
+
+You restore the `Backup` CR by creating a `Restore` CR. 
+
+
+
+
+### 5.13.1.2. Install the Data Protection Application
+
+You install the Data Protection Application (DPA) by creating an instance of the `DataProtectionApplication` API. 
+
+**Prerequisites**
+
+  * You have installed the OADP Operator. 
+  * You have configured object storage as a backup location. 
+  * If you use snapshots to back up PVs, your cloud provider supports either a native snapshot API or Container Storage Interface (CSI) snapshots. 
+  * If the backup and snapshot locations use the same credentials, you have created a `Secret` with the default name for your storage provider: `cloud-credentials` for AWS, Multicloud Object Gateway (MCG), Red Hat OpenShift Data Foundation (ODF), IBM Cloud, or KubeVirt; `cloud-credentials-azure` for Azure; or `cloud-credentials-gcp` for GCP. 
+  * If the backup and snapshot locations use different credentials, you have created two `Secrets`: 
+
+    * `Secret` with a custom name for the backup location. You add this `Secret` to the `DataProtectionApplication` CR. 
+    * `Secret` with another custom name for the snapshot location. You add this `Secret` to the `DataProtectionApplication` CR. 
+
+Note
+
+If you do not want to specify backup or snapshot locations during the installation, you can create a default `Secret` with an empty `credentials-velero` file. If there is no default `Secret`, the installation will fail. 
+
+
+
+
+**Procedure**
+
+  1. Click **Ecosystem** **Installed Operators** and select the OADP Operator. 
+  2. Under **Provided APIs** , click **Create instance** in the **DataProtectionApplication** box. 
+  3. Click **YAML View** and update the parameters of the `DataProtectionApplication` manifest for your storage provider. 
+  4. Click **Create**. 
+
+
+
+**Verification**
+
+  1. Verify the installation by viewing the OpenShift API for Data Protection (OADP) resources by running the following command: 
+
+```shell-session
+$ oc get all -n openshift-adp
+```
+
+
+```plaintext
+NAME                                                     READY   STATUS    RESTARTS   AGE
+pod/oadp-operator-controller-manager-67d9494d47-6l8z8    2/2     Running   0          2m8s
+pod/node-agent-9cq4q                                     1/1     Running   0          94s
+pod/node-agent-m4lts                                     1/1     Running   0          94s
+pod/node-agent-pv4kr                                     1/1     Running   0          95s
+pod/velero-588db7f655-n842v                              1/1     Running   0          95s
+
+NAME                                                       TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+service/oadp-operator-controller-manager-metrics-service   ClusterIP   172.30.70.140    <none>        8443/TCP   2m8s
+service/openshift-adp-velero-metrics-svc                   ClusterIP   172.30.10.0      <none>        8085/TCP   8h
+
+NAME                        DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+daemonset.apps/node-agent    3         3         3       3            3           <none>          96s
+
+NAME                                                READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/oadp-operator-controller-manager    1/1     1            1           2m9s
+deployment.apps/velero                              1/1     1            1           96s
+
+NAME                                                           DESIRED   CURRENT   READY   AGE
+replicaset.apps/oadp-operator-controller-manager-67d9494d47    1         1         1       2m9s
+replicaset.apps/velero-588db7f655                              1         1         1       96s
+```
+
+
+  2. Verify that the `DataProtectionApplication` (DPA) is reconciled by running the following command: 
+
+```shell-session
+$ oc get dpa dpa-sample -n openshift-adp -o jsonpath='{.status}'
+```
+
+
+```yaml
+{"conditions":[{"lastTransitionTime":"2023-10-27T01:23:57Z","message":"Reconcile complete","reason":"Complete","status":"True","type":"Reconciled"}]}
+```
+
+
+  3. Verify the `type` is set to `Reconciled`. 
+  4. Verify the backup storage location and confirm that the `PHASE` is `Available` by running the following command: 
+
+```shell-session
+$ oc get backupstoragelocations.velero.io -n openshift-adp
+```
+
+
+```yaml
+NAME           PHASE       LAST VALIDATED   AGE     DEFAULT
+dpa-sample-1   Available   1s               3d16h   true
+```
+
+
+#### 5.13.1.2.1. DataProtectionApplication CR examples by storage provider
+
+Configure the `DataProtectionApplication` (DPA) custom resource (CR) for your storage provider. The following examples show the DPA manifest for each supported provider with the relevant configuration parameters. 
+
+The following parameters are common across all provider configurations: 
+
+`namespace`
+     Specifies the default namespace for OADP which is `openshift-adp`. The namespace is a variable and is configurable. 
+`openshift`
+     Specifies that the `openshift` plugin is mandatory. 
+`resourceTimeout`
+     Specifies how many minutes to wait for several Velero resources such as Velero CRD availability, volumeSnapshot deletion, and backup repository availability, before timeout occurs. The default is 10m. 
+`nodeAgent`
+     Specifies the administrative agent that routes the administrative requests to servers. 
+`enable`
+     Set this value to `true` if you want to enable `nodeAgent` and perform File System Backup. 
+`uploaderType`
+     Specifies the uploader type. Enter `kopia` or `restic` as your uploader. You cannot change the selection after the installation. For the Built-in DataMover you must use Kopia. The `nodeAgent` deploys a daemon set, which means that the `nodeAgent` pods run on each working node. You can configure File System Backup by adding `spec.defaultVolumesToFsBackup: true` to the `Backup` CR. 
+`nodeSelector`
+     Specifies the nodes on which Kopia or Restic are available. By default, Kopia or Restic run on all nodes. 
+`bucket`
+     Specifies a bucket as the backup storage location. If the bucket is not a dedicated bucket for Velero backups, you must specify a prefix. 
+`prefix`
+     Specifies a prefix for Velero backups, for example, `velero`, if the bucket is used for multiple purposes. 
+
+The following sections provide DPA configuration examples and provider-specific parameters for each supported storage provider. 
+
+Amazon Web Services (AWS)
+    
+
+```yaml
+apiVersion: oadp.openshift.io/v1alpha1
+kind: DataProtectionApplication
+metadata:
+  name: <dpa_sample>
+  namespace: openshift-adp
+spec:
+  configuration:
+    velero:
+      defaultPlugins:
+        - openshift
+        - aws
+      resourceTimeout: 10m
+    nodeAgent:
+      enable: true
+      uploaderType: kopia
+      podConfig:
+        nodeSelector: <node_selector>
+  backupLocations:
+    - name: default
+      velero:
+        provider: aws
+        default: true
+        objectStorage:
+          bucket: <bucket_name>
+          prefix: <prefix>
+        config:
+          region: <region>
+          profile: "default"
+          s3ForcePathStyle: "true"
+          s3Url: <s3_url>
+        credential:
+          key: cloud
+          name: cloud-credentials
+  snapshotLocations:
+    - name: default
+      velero:
+        provider: aws
+        config:
+          region: <region>
+          profile: "default"
+        credential:
+          key: cloud
+          name: cloud-credentials
+```
+
+
+`s3ForcePathStyle`
+     Specifies whether to force path style URLs for S3 objects (Boolean). Not Required for AWS S3. Required only for S3 compatible storage. 
+`s3Url`
+     Specifies the URL of the object store that you are using to store backups. Not required for AWS S3. Required only for S3 compatible storage. 
+`name`
+     Specifies the name of the `Secret` object that you created. If you do not specify this value, the default name, `cloud-credentials`, is used. If you specify a custom name, the custom name is used for the backup location. 
+`snapshotLocations`
+     Specifies a snapshot location, unless you use CSI snapshots or a File System Backup (FSB) to back up PVs. 
+`region`
+     Specifies that the snapshot location must be in the same region as the PVs. 
+IBM Cloud
+    
+
+```yaml
+apiVersion: oadp.openshift.io/v1alpha1
+kind: DataProtectionApplication
+metadata:
+  namespace: openshift-adp
+  name: <dpa_name>
+spec:
+  configuration:
+    velero:
+      defaultPlugins:
+      - openshift
+      - aws
+      - csi
+  backupLocations:
+    - velero:
+        provider: aws
+        default: true
+        objectStorage:
+          bucket: <bucket_name>
+          prefix: velero
+        config:
+          insecureSkipTLSVerify: 'true'
+          profile: default
+          region: <region_name>
+          s3ForcePathStyle: 'true'
+          s3Url: <s3_url>
+        credential:
+          key: cloud
+          name: cloud-credentials
+```
+
+
+`provider`
+     Specifies that the provider is `aws` when you use IBM Cloud as a backup storage location. 
+`bucket`
+     Specifies the IBM Cloud Object Storage (COS) bucket name. 
+`region`
+     Specifies the COS region name, for example, `eu-gb`. 
+`s3Url`
+     Specifies the S3 URL of the COS bucket. For example, `<http://s3.eu-gb.cloud-object-storage.appdomain.cloud>`. Here, `eu-gb` is the region name. Replace the region name according to your bucket region. 
+`name`
+     Specifies the name of the secret you created by using the access key and the secret access key from the `HMAC` credentials. 
+Microsoft Azure
+    
+
+```yaml
+apiVersion: oadp.openshift.io/v1alpha1
+kind: DataProtectionApplication
+metadata:
+  name: <dpa_sample>
+  namespace: openshift-adp
+spec:
+  configuration:
+    velero:
+      defaultPlugins:
+        - azure
+        - openshift
+      resourceTimeout: 10m
+    nodeAgent:
+      enable: true
+      uploaderType: kopia
+      podConfig:
+        nodeSelector: <node_selector>
+  backupLocations:
+    - velero:
+        config:
+          resourceGroup: <azure_resource_group>
+          storageAccount: <azure_storage_account_id>
+          subscriptionId: <azure_subscription_id>
+        credential:
+          key: cloud
+          name: cloud-credentials-azure
+        provider: azure
+        default: true
+        objectStorage:
+          bucket: <bucket_name>
+          prefix: <prefix>
+  snapshotLocations:
+    - velero:
+        config:
+          resourceGroup: <azure_resource_group>
+          subscriptionId: <azure_subscription_id>
+          incremental: "true"
+        name: default
+        provider: azure
+        credential:
+          key: cloud
+          name: cloud-credentials-azure
+```
+
+
+`resourceGroup`
+     Specifies the Azure resource group. 
+`storageAccount`
+     Specifies the Azure storage account ID. 
+`subscriptionId`
+     Specifies the Azure subscription ID. 
+`name`
+     Specifies the name of the `Secret` object. If you do not specify this value, the default name, `cloud-credentials-azure`, is used. If you specify a custom name, the custom name is used for the backup location. 
+`snapshotLocations`
+     Specifies the snapshot location. You do not need to specify a snapshot location if you use CSI snapshots or Restic to back up PVs. 
+Google Cloud
+    
+
+```yaml
+apiVersion: oadp.openshift.io/v1alpha1
+kind: DataProtectionApplication
+metadata:
+  name: <dpa_sample>
+  namespace: <OPERATOR_INSTALL_NS>
+spec:
+  configuration:
+    velero:
+      defaultPlugins:
+        - gcp
+        - openshift
+      resourceTimeout: 10m
+    nodeAgent:
+      enable: true
+      uploaderType: kopia
+      podConfig:
+        nodeSelector: <node_selector>
+  backupLocations:
+    - velero:
+        provider: gcp
+        default: true
+        credential:
+          key: cloud
+          name: cloud-credentials-gcp
+        objectStorage:
+          bucket: <bucket_name>
+          prefix: <prefix>
+  snapshotLocations:
+    - velero:
+        provider: gcp
+        default: true
+        config:
+          project: <project>
+          snapshotLocation: us-west1
+        credential:
+          key: cloud
+          name: cloud-credentials-gcp
+  backupImages: true
+```
+
+
+`key`
+     Specifies the secret key that contains credentials. For Google workload identity federation cloud authentication use `service_account.json`. 
+`name`
+     Specifies the secret name that contains credentials. If you do not specify this value, the default name, `cloud-credentials-gcp`, is used. 
+`snapshotLocations`
+     Specifies a snapshot location, unless you use CSI snapshots or Restic to back up PVs. 
+`snapshotLocation`
+     Specifies that the snapshot location must be in the same region as the PVs. 
+`backupImages`
+     Specifies that Google workload identity federation supports internal image backup. Set this field to `false` if you do not want to use image backup. 
+MCG (Multicloud Object Gateway)
+    
+
+```yaml
+apiVersion: oadp.openshift.io/v1alpha1
+kind: DataProtectionApplication
+metadata:
+  name: <dpa_sample>
+  namespace: openshift-adp
+spec:
+  configuration:
+    velero:
+      defaultPlugins:
+        - aws
+        - openshift
+      resourceTimeout: 10m
+    nodeAgent:
+      enable: true
+      uploaderType: kopia
+      podConfig:
+        nodeSelector: <node_selector>
+  backupLocations:
+    - velero:
+        config:
+          profile: "default"
+          region: <region_name>
+          s3Url: <url>
+          insecureSkipTLSVerify: "true"
+          s3ForcePathStyle: "true"
+        provider: aws
+        default: true
+        credential:
+          key: cloud
+          name: cloud-credentials
+        objectStorage:
+          bucket: <bucket_name>
+          prefix: <prefix>
+```
+
+
+`aws`
+     Specifies that an object store plugin corresponding to your storage locations is required. For all S3 providers, the required plugin is `aws`. For Azure and Google Cloud object stores, the `azure` or `gcp` plugin is required. 
+`region`
+     Specifies the region, following the naming convention of the documentation of your object storage server. 
+`s3Url`
+     Specifies the URL of the S3 endpoint. 
+`name`
+     Specifies the name of the `Secret` object that you created. If you do not specify this value, the default name, `cloud-credentials`, is used. If you specify a custom name, the custom name is used for the backup location. 
+Red Hat OpenShift Data Foundation (ODF)
+    
+
+```yaml
+apiVersion: oadp.openshift.io/v1alpha1
+kind: DataProtectionApplication
+metadata:
+  name: <dpa_sample>
+  namespace: openshift-adp
+spec:
+  configuration:
+    velero:
+      defaultPlugins:
+        - aws
+        - kubevirt
+        - csi
+        - openshift
+      resourceTimeout: 10m
+    nodeAgent:
+      enable: true
+      uploaderType: kopia
+      podConfig:
+        nodeSelector: <node_selector>
+  backupLocations:
+    - velero:
+        provider: aws
+        default: true
+        credential:
+          key: cloud
+          name: <default_secret>
+        objectStorage:
+          bucket: <bucket_name>
+          prefix: <prefix>
+```
+
+
+`aws`
+     Specifies that an object store plugin corresponding to your storage locations is required. For all S3 providers, the required plugin is `aws`. For Azure and Google Cloud object stores, the `azure` or `gcp` plugin is required. 
+`kubevirt`
+     Optional: The `kubevirt` plugin is used with OpenShift Virtualization. 
+`csi`
+     Specifies the `csi` default plugin if you use CSI snapshots to back up PVs. The `csi` plugin uses the [Velero CSI beta snapshot APIs](https://velero.io/docs/main/csi/). You do not need to configure a snapshot location. 
+`provider`
+     Specifies the backup provider. 
+`name`
+     Specifies the correct default name for the `Secret`, for example, `cloud-credentials-gcp`, if you use a default plugin for the backup provider. If specifying a custom name, then the custom name is used for the backup location. If you do not specify a `Secret` name, the default name is used. 
+KubeVirt (OpenShift Virtualization)
+    
+
+```yaml
+apiVersion: oadp.openshift.io/v1alpha1
+kind: DataProtectionApplication
+metadata:
+  name: <dpa_sample>
+  namespace: openshift-adp
+spec:
+  configuration:
+    velero:
+      defaultPlugins:
+        - kubevirt
+        - gcp
+        - csi
+        - openshift
+      resourceTimeout: 10m
+    nodeAgent:
+      enable: true
+      uploaderType: kopia
+      podConfig:
+        nodeSelector: <node_selector>
+  backupLocations:
+    - velero:
+        provider: gcp
+        default: true
+        credential:
+          key: cloud
+          name: <default_secret>
+        objectStorage:
+          bucket: <bucket_name>
+          prefix: <prefix>
+```
+
+
+`kubevirt`
+     Specifies that the `kubevirt` plugin is mandatory for OpenShift Virtualization. 
+`gcp`
+     Specifies the plugin for the backup provider, for example, `gcp`, if it exists. 
+`csi`
+     Specifies that the `csi` plugin is mandatory for backing up PVs with CSI snapshots. The `csi` plugin uses the [Velero CSI beta snapshot APIs](https://velero.io/docs/main/csi/). You do not need to configure a snapshot location. 
+`provider`
+     Specifies the backup provider. 
+`name`
+     Specifies the correct default name for the `Secret`, for example, `cloud-credentials-gcp`, if you use a default plugin for the backup provider. If specifying a custom name, then the custom name is used for the backup location. If you do not specify a `Secret` name, the default name is used. 
+
+Warning
+
+If you run a backup of a Microsoft Windows virtual machine (VM) immediately after the VM reboots, the backup might fail with a `PartiallyFailed` error. This is because, immediately after a VM boots, the Microsoft Windows Volume Shadow Copy Service (VSS) and Guest Agent (GA) service are not ready. The VSS and GA service being unready causes the backup to fail. In such a case, retry the backup a few minutes after the VM boots. 
+
+### 5.13.1.3. Back up a single VM
+
+If you have a namespace with multiple virtual machines (VMs), and want to back up only one of them, you can use the label selector to filter the VM that needs to be included in the backup. You can filter the VM by using the `app: vmname` label. 
+
+**Prerequisites**
+
+  * You have installed the OADP Operator. 
+  * You have multiple VMs running in a namespace. 
+  * You have added the `kubevirt` plugin in the `DataProtectionApplication` (DPA) custom resource (CR). 
+  * You have configured the `BackupStorageLocation` CR in the `DataProtectionApplication` CR and `BackupStorageLocation` is available. 
+
+
+
+**Procedure**
+
+  1. Configure the `Backup` CR as shown in the following example: 
+
+**Example`Backup` CR**
+
+```yaml
+apiVersion: velero.io/v1
+kind: Backup
+metadata:
+  name: vmbackupsingle
+  namespace: openshift-adp
+spec:
+  snapshotMoveData: true
+  includedNamespaces:
+  - <vm_namespace>
+  labelSelector:
+    matchLabels:
+      app: <vm_app_name>
+  storageLocation: <backup_storage_location_name>
+```
+
+
+where: 
+
+`vm_namespace`
+     Specifies the name of the namespace where you have created the VMs. 
+`vm_app_name`
+     Specifies the VM name that needs to be backed up. 
+`backup_storage_location_name`
+     Specifies the name of the `BackupStorageLocation` CR. 
+
+  2. To create a `Backup` CR, run the following command: 
+
+```shell-session
+$ oc apply -f <backup_cr_file_name>
+```
+
+
+where: 
+
+`backup_cr_file_name`
+     Specifies the name of the `Backup` CR file. 
+
+
+
+
+### 5.13.1.4. Restore a single VM
+
+After you have backed up a single virtual machine (VM) by using the label selector in the `Backup` custom resource (CR), you can create a `Restore` CR and point it to the backup. This restore operation restores a single VM. 
+
+**Prerequisites**
+
+  * You have installed the OADP Operator. 
+  * You have backed up a single VM by using the label selector. 
+
+
+
+**Procedure**
+
+  1. Configure the `Restore` CR as shown in the following example: 
+
+**Example`Restore` CR**
+
+```yaml
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: vmrestoresingle
+  namespace: openshift-adp
+spec:
+  backupName: vmbackupsingle
+  restorePVs: true
+```
+
+
+where: 
+
+`vmbackupsingle`
+     Specifies the name of the backup of a single VM. 
+
+  2. To restore the single VM, run the following command: 
+
+```shell-session
+$ oc apply -f <restore_cr_file_name>
+```
+
+
+where: 
+
+`restore_cr_file_name`
+    
+
+Specifies the name of the `Restore` CR file. 
+
+Note
+
+When you restore a backup of VMs, you might notice that the Ceph storage capacity allocated for the restore is higher than expected. This behavior is observed only during the `kubevirt` restore and if the volume type of the VM is `block`. 
+
+Use the `rbd sparsify` tool to reclaim space on target volumes. For more details, see [Reclaiming space on target volumes](https://access.redhat.com/documentation/en-us/red_hat_openshift_data_foundation/latest/html-single/managing_and_allocating_storage_resources/index#reclaiming-space-on-target-volumes_rhodf). 
+
+
+
+
+### 5.13.1.5. Restore a single VM from a backup of multiple VMs
+
+If you have a backup containing multiple virtual machines (VMs), and you want to restore only one VM, you can use the `LabelSelectors` section in the `Restore` CR to select the VM to restore. 
+
+To ensure that the persistent volume claim (PVC) attached to the VM is correctly restored, and the restored VM is not stuck in a `Provisioning` status, use both the `app: <vm_name>` and the `kubevirt.io/created-by` labels. To match the `kubevirt.io/created-by` label, use the UID of `DataVolume` of the VM. 
+
+**Prerequisites**
+
+  * You have installed the OADP Operator. 
+  * You have labeled the VMs that need to be backed up. 
+  * You have a backup of multiple VMs. 
+
+
+
+**Procedure**
+
+  1. Before you take a backup of many VMs, ensure that the VMs are labeled by running the following command: 
+
+```shell-session
+$ oc label vm <vm_name> app=<vm_name> -n openshift-adp
+```
+
+
+  2. Configure the label selectors in the `Restore` CR as shown in the following example: 
+
+**Example`Restore` CR**
+
+```yaml
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: singlevmrestore
+  namespace: openshift-adp
+spec:
+  backupName: multiplevmbackup
+  restorePVs: true
+  LabelSelectors:
+    - matchLabels:
+        kubevirt.io/created-by: <datavolume_uid>
+    - matchLabels:
+        app: <vm_name>
+```
+
+
+where: 
+
+`datavolume_uid`
+     Specifies the UID of `DataVolume` of the VM that you want to restore. For example, `b6…​53a-ddd7-4d9d-9407-a0c…​e5`. 
+`vm_name`
+     Specifies the name of the VM that you want to restore. For example, `test-vm`. 
+
+  3. To restore a VM, run the following command: 
+
+```shell-session
+$ oc apply -f <restore_cr_file_name>
+```
+
+
+where: 
+
+`restore_cr_file_name`
+     Specifies the name of the `Restore` CR file. 
+
+
+
+
+### 5.13.1.6. Configure the DPA with client burst and QPS settings
+
+The burst setting determines how many requests can be sent to the `velero` server before the limit is applied. After the burst limit is reached, the queries per second (QPS) setting determines how many additional requests can be sent per second. 
+
+You can set the burst and QPS values of the `velero` server by configuring the Data Protection Application (DPA) with the burst and QPS values. You can use the `dpa.configuration.velero.client-burst` and `dpa.configuration.velero.client-qps` fields of the DPA to set the burst and QPS values. 
+
+**Prerequisites**
+
+  * You have installed the OADP Operator. 
+
+
+
+**Procedure**
+
+  * Configure the `client-burst` and the `client-qps` fields in the DPA as shown in the following example: 
+
+**Example Data Protection Application**
+
+```yaml
+apiVersion: oadp.openshift.io/v1alpha1
+kind: DataProtectionApplication
+metadata:
+  name: test-dpa
+  namespace: openshift-adp
+spec:
+  backupLocations:
+    - name: default
+      velero:
+        config:
+          insecureSkipTLSVerify: "true"
+          profile: "default"
+          region: <bucket_region>
+          s3ForcePathStyle: "true"
+          s3Url: <bucket_url>
+        credential:
+          key: cloud
+          name: cloud-credentials
+        default: true
+        objectStorage:
+          bucket: <bucket_name>
+          prefix: velero
+        provider: aws
+  configuration:
+    nodeAgent:
+      enable: true
+      uploaderType: restic
+    velero:
+      client-burst: 500
+      client-qps: 300
+      defaultPlugins:
+        - openshift
+        - aws
+        - kubevirt
+```
+
+
+where: 
+
+`client-burst`
+     Specifies the `client-burst` value. In this example, the `client-burst` field is set to 500. 
+`client-qps`
+     Specifies the `client-qps` value. In this example, the `client-qps` field is set to 300. 
+
+
+
+
+### 5.13.1.7. Configure the node agent as a non-root and non-privileged user
+
+To enhance the node agent security, you can configure the OADP Operator node agent daemonset to run as a non-root and non-privileged user by using the `spec.configuration.velero.disableFsBackup` setting in the `DataProtectionApplication` (DPA) custom resource (CR). 
+
+By setting the `spec.configuration.velero.disableFsBackup` setting to `true`, the node agent security context sets the root file system to read-only and sets the `privileged` flag to `false`. 
+
+Note
+
+Setting `spec.configuration.velero.disableFsBackup` to `true` enhances the node agent security by removing the need for privileged containers and enforcing a read-only root file system. 
+
+However, it also disables File System Backup (FSB) with Kopia. If your workloads rely on FSB for backing up volumes that do not support native snapshots, then you should evaluate whether the `disableFsBackup` configuration fits your use case. 
+
+**Prerequisites**
+
+  * You have installed the OADP Operator. 
+
+
+
+**Procedure**
+
+  * Configure the `disableFsBackup` field in the DPA as shown in the following example: 
+
+```yaml
+apiVersion: oadp.openshift.io/v1alpha1
+kind: DataProtectionApplication
+metadata:
+  name: ts-dpa
+  namespace: openshift-adp
+spec:
+  backupLocations:
+  - velero:
+      credential:
+        key: cloud
+        name: cloud-credentials
+      default: true
+      objectStorage:
+        bucket: <bucket_name>
+        prefix: velero
+      provider: gcp
+  configuration:
+    nodeAgent:
+      enable: true
+      uploaderType: kopia
+    velero:
+      defaultPlugins:
+      - csi
+      - gcp
+      - openshift
+      disableFsBackup: true
+```
+
+
+where: 
+
+`nodeAgent`
+     Specifies to enable the node agent in the DPA. 
+`disableFsBackup`
+     Specifies to set the `disableFsBackup` field to `true`. 
+
+
+
+
+**Verification**
+
+  1. Verify that the node agent security context is set to run as non-root and the root file system is `readOnly` by running the following command: 
+
+```shell-session
+$ oc get daemonset node-agent -o yaml
+```
+
+
+The example output is as following: 
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  ...
+  name: node-agent
+  namespace: openshift-adp
+  ...
+spec:
+  ...
+  template:
+    metadata:
+      ...
+    spec:
+      containers:
+      ...
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+        ...
+      nodeSelector:
+        kubernetes.io/os: linux
+      os:
+        name: linux
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccount: velero
+      serviceAccountName: velero
+      ....
+```
+
+
+where: 
+
+`allowPrivilegeEscalation`
+     Specifies that the `allowPrivilegeEscalation` field is false. 
+`privileged`
+     Specifies that the `privileged` field is false. 
+`readOnlyRootFilesystem`
+     Specifies that the root file system is read-only. 
+`runAsNonRoot`
+     Specifies that the node agent is run as a non-root user. 
+
+
+
+
+### 5.13.1.8. Configure node agents and node labels
+
+The Data Protection Application (DPA) uses the `nodeSelector` field to select which nodes can run the node agent. The `nodeSelector` field is the recommended form of node selection constraint. 
+
+**Procedure**
+
+  1. Run the node agent on any node that you choose by adding a custom label: 
+
+```shell-session
+$ oc label node/<node_name> node-role.kubernetes.io/nodeAgent=""
+```
+
+
+Note
+
+Any label specified must match the labels on each node. 
+
+  2. Use the same custom label in the `DPA.spec.configuration.nodeAgent.podConfig.nodeSelector` field, which you used for labeling nodes: 
+
+```shell-session
+configuration:
+  nodeAgent:
+    enable: true
+    podConfig:
+      nodeSelector:
+        node-role.kubernetes.io/nodeAgent: ""
+```
+
+
+The following example is an anti-pattern of `nodeSelector` and does not work unless both labels, `node-role.kubernetes.io/infra: ""` and `node-role.kubernetes.io/worker: ""`, are on the node: 
+
+```shell-session
+    configuration:
+      nodeAgent:
+        enable: true
+        podConfig:
+          nodeSelector:
+            node-role.kubernetes.io/infra: ""
+            node-role.kubernetes.io/worker: ""
+```
+
+
+### 5.13.1.9. Configure node agent load affinity
+
+You can schedule the node agent pods on specific nodes by using the `spec.podConfig.nodeSelector` object of the `DataProtectionApplication` (DPA) custom resource (CR). 
+
+See the following example in which you can schedule the node agent pods on nodes with the label `label.io/role: cpu-1` and `other-label.io/other-role: cpu-2`. 
+
+```yaml
+...
+spec:
+  configuration:
+    nodeAgent:
+      enable: true
+      uploaderType: kopia
+      podConfig:
+        nodeSelector:
+          label.io/role: cpu-1
+          other-label.io/other-role: cpu-2
+        ...
+```
+
+
+You can add more restrictions on the node agent pods scheduling by using the `nodeagent.loadAffinity` object in the DPA spec. 
+
+**Prerequisites**
+
+  * You must be logged in as a user with `cluster-admin` privileges. 
+  * You have installed the OADP Operator. 
+  * You have configured the DPA CR. 
+
+
+
+**Procedure**
+
+  * Configure the DPA spec `nodegent.loadAffinity` object as shown in the following example. 
+
+In the example, you ensure that the node agent pods are scheduled only on nodes with the label `label.io/role: cpu-1` and the label `label.io/hostname` matching with either `node1` or `node2`. 
+
+```yaml
+...
+spec:
+  configuration:
+    nodeAgent:
+      enable: true
+      loadAffinity:
+        - nodeSelector:
+            matchLabels:
+              label.io/role: cpu-1
+            matchExpressions:
+              - key: label.io/hostname
+                operator: In
+                values:
+                  - node1
+                  - node2
+                  ...
+```
+
+
+where: 
+
+`loadAffinity`
+     Specifies the `loadAffinity` object by adding the `matchLabels` and `matchExpressions` objects. 
+`matchExpressions`
+     Specifies the `matchExpressions` object to add restrictions on the node agent pods scheduling. 
+
+
+
+
+### 5.13.1.10. Node agent load affinity guidelines
+
+Use the following guidelines to configure the node agent `loadAffinity` object in the `DataProtectionApplication` (DPA) custom resource (CR). 
+
+  * Use the `spec.nodeagent.podConfig.nodeSelector` object for simple node matching. 
+  * Use the `loadAffinity.nodeSelector` object without the `podConfig.nodeSelector` object for more complex scenarios. 
+  * You can use both `podConfig.nodeSelector` and `loadAffinity.nodeSelector` objects, but the `loadAffinity` object must be equal or more restrictive as compared to the `podConfig` object. In this scenario, the `podConfig.nodeSelector` labels must be a subset of the labels used in the `loadAffinity.nodeSelector` object. 
+  * You cannot use the `matchExpressions` and `matchLabels` fields if you have configured both `podConfig.nodeSelector` and `loadAffinity.nodeSelector` objects in the DPA. 
+  * See the following example to configure both `podConfig.nodeSelector` and `loadAffinity.nodeSelector` objects in the DPA. 
+
+```yaml
+...
+spec:
+  configuration:
+    nodeAgent:
+      enable: true
+      uploaderType: kopia
+      loadAffinity:
+        - nodeSelector:
+            matchLabels:
+              label.io/location: 'US'
+              label.io/gpu: 'no'
+      podConfig:
+        nodeSelector:
+          label.io/gpu: 'no'
+```
+
+
+### 5.13.1.11. Configure node agent load concurrency
+
+You can control the maximum number of node agent operations that can run simultaneously on each node within your cluster. 
+
+You can configure it using one of the following fields of the Data Protection Application (DPA): 
+
+  * `globalConfig`: Defines a default concurrency limit for the node agent across all nodes. 
+  * `perNodeConfig`: Specifies different concurrency limits for specific nodes based on `nodeSelector` labels. This provides flexibility for environments where certain nodes might have different resource capacities or roles. 
+
+
+
+**Prerequisites**
+
+  * You must be logged in as a user with `cluster-admin` privileges. 
+
+
+
+**Procedure**
+
+  1. If you want to use load concurrency for specific nodes, add labels to those nodes: 
+
+```shell-session
+$ oc label node/<node_name> label.io/instance-type='large'
+```
+
+
+  2. Configure the load concurrency fields for your DPA instance: 
+
+```yaml
+  configuration:
+    nodeAgent:
+      enable: true
+      uploaderType: kopia
+      loadConcurrency:
+        globalConfig: 1
+        perNodeConfig:
+        - nodeSelector:
+              matchLabels:
+                 label.io/instance-type: large
+          number: 3
+```
+
+
+where: 
+
+`globalConfig`
+     Specifies the global concurrent number. The default value is 1, which means there is no concurrency and only one load is allowed. The `globalConfig` value does not have a limit. 
+`label.io/instance-type`
+     Specifies the label for per-node concurrency. 
+`number`
+     Specifies the per-node concurrent number. You can specify many per-node concurrent numbers, for example, based on the instance type and size. The range of per-node concurrent number is the same as the global concurrent number. If the configuration file contains a per-node concurrent number and a global concurrent number, the per-node concurrent number takes precedence. 
+
+
+
+
+### 5.13.1.12. Configure repository maintenance
+
+OADP repository maintenance is a background job, you can configure it independently of the node agent pods. This means that you can schedule the repository maintenance pod on a node where the node agent is or is not running. 
+
+You can use the repository maintenance job affinity configurations in the `DataProtectionApplication` (DPA) custom resource (CR) only if you use Kopia as the backup repository. 
+
+You have the option to configure the load affinity at the global level affecting all repositories. Or you can configure the load affinity for each repository. You can also use a combination of global and per-repository configuration. 
+
+**Prerequisites**
+
+  * You must be logged in as a user with `cluster-admin` privileges. 
+  * You have installed the OADP Operator. 
+  * You have configured the DPA CR. 
+
+
+
+**Procedure**
+
+  * Configure the `loadAffinity` object in the DPA spec by using either one or both of the following methods: 
+
+    * Global configuration: Configure load affinity for all repositories as shown in the following example: 
+
+```yaml
+...
+spec:
+  configuration:
+    repositoryMaintenance:
+      global:
+        podResources:
+          cpuRequest: "100m"
+          cpuLimit: "200m"
+          memoryRequest: "100Mi"
+          memoryLimit: "200Mi"
+        loadAffinity:
+          - nodeSelector:
+              matchLabels:
+                label.io/gpu: 'no'
+              matchExpressions:
+                - key: label.io/location
+                  operator: In
+                  values:
+                    - US
+                    - EU
+```
+
+
+where: 
+
+`repositoryMaintenance`
+     Specifies the `repositoryMaintenance` object as shown in the example. 
+`global`
+     Specifies the `global` object to configure load affinity for all repositories. 
+
+    * Per-repository configuration: Configure load affinity per repository as shown in the following example: 
+
+```yaml
+...
+spec:
+  configuration:
+    repositoryMaintenance:
+      myrepositoryname:
+        loadAffinity:
+          - nodeSelector:
+              matchLabels:
+                label.io/cpu: 'yes'
+```
+
+
+where: 
+
+`myrepositoryname`
+     Specifies the `repositoryMaintenance` object for each repository. 
+
+
+
+
+### 5.13.1.13. Configure Velero load affinity
+
+With each OADP deployment, there is one Velero pod and its main purpose is to schedule Velero workloads. To schedule the Velero pod, you can use the `velero.podConfig.nodeSelector` and the `velero.loadAffinity` objects in the `DataProtectionApplication` (DPA) custom resource (CR) spec. 
+
+Use the `podConfig.nodeSelector` object to assign the Velero pod to specific nodes. You can also configure the `velero.loadAffinity` object for pod-level affinity and anti-affinity. 
+
+The OpenShift scheduler applies the rules and performs the scheduling of the Velero pod deployment. 
+
+**Prerequisites**
+
+  * You must be logged in as a user with `cluster-admin` privileges. 
+  * You have installed the OADP Operator. 
+  * You have configured the DPA CR. 
+
+
+
+**Procedure**
+
+  * Configure the `velero.podConfig.nodeSelector` and the `velero.loadAffinity` objects in the DPA spec as shown in the following examples: 
+
+    * `velero.podConfig.nodeSelector` object configuration: 
+
+```yaml
+...
+spec:
+  configuration:
+    velero:
+      podConfig:
+        nodeSelector:
+          some-label.io/custom-node-role: backup-core
+```
+
+
+    * `velero.loadAffinity` object configuration: 
+
+```yaml
+...
+spec:
+  configuration:
+    velero:
+      loadAffinity:
+        - nodeSelector:
+            matchLabels:
+              label.io/gpu: 'no'
+            matchExpressions:
+              - key: label.io/location
+                operator: In
+                values:
+                  - US
+                  - EU
+```
+
+
+### 5.13.1.14. Configure a priority class for node agent and Velero pods
+
+Configure a `priorityClassName` field for the node agent and Velero pods by editing the `DataProtectionApplication` (DPA) custom resource (CR). This helps you ensure that the Kubernetes scheduler prioritizes OADP pods during resource contention. 
+
+By setting a priority class, you ensure that critical OADP pods are scheduled first after events such as worker node outages, when user workloads might otherwise consume available resources. 
+
+**Prerequisites**
+
+  * The OADP Operator is installed. 
+  * A DPA CR is configured. 
+  * A `PriorityClass` object is created in the cluster. 
+
+
+
+**Procedure**
+
+  1. In your DPA CR, configure the `priorityClassName` field for the node agent, Velero, or both, in the `podConfig` object as shown in the following example: 
+
+```yaml
+apiVersion: oadp.openshift.io/v1alpha1
+kind: DataProtectionApplication
+metadata:
+  name: <dpa_name>
+  namespace: openshift-adp
+spec:
+# ...
+  configuration:
+    nodeAgent:
+      enable: true
+      uploaderType: kopia
+      podConfig:
+        priorityClassName: <priority_class_name>
+    velero:
+      podConfig:
+        priorityClassName: <priority_class_name>
+```
+
+
+where: `<priority_class_name>`:: Specifies the name of an existing `PriorityClass` to apply to the pods managed by this `podConfig` object. For example, `system-cluster-critical`. 
+
+  2. Apply the `DataProtectionApplication` CR by running the following command: 
+
+```shell-session
+$ oc apply -f <dpa_file_name>
+```
+
+
+**Verification**
+
+  1. Verify that the node agent daemon set pods have the correct priority class by running the following command: 
+
+```shell-session
+$ oc get pods -n openshift-adp -l name=node-agent -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.priorityClassName}{"\n"}{end}'
+```
+
+
+```shell-session
+node-agent-xxxxx <priority_class_name>
+node-agent-yyyyy <priority_class_name>
+```
+
+
+  2. Verify that the Velero deployment pods have the correct priority class by running the following command: 
+
+```shell-session
+$ oc get pods -n openshift-adp -l app.kubernetes.io/name=velero -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.priorityClassName}{"\n"}{end}'
+```
+
+
+```shell-session
+velero-xxxxx <priority_class_name>
+```
+
+
+### 5.13.1.15. Override the imagePullPolicy setting in the DPA
+
+In OADP 1.4.0 or earlier, the Operator sets the `imagePullPolicy` field of the Velero and node agent pods to `Always` for all images. 
+
+In OADP 1.4.1 or later, the Operator first checks if each image has the `sha256` or `sha512` digest and sets the `imagePullPolicy` field accordingly: 
+
+  * If the image has the digest, the Operator sets `imagePullPolicy` to `IfNotPresent`. 
+  * If the image does not have the digest, the Operator sets `imagePullPolicy` to `Always`. 
+
+
+
+You can also override the `imagePullPolicy` field by using the `spec.imagePullPolicy` field in the Data Protection Application (DPA). 
+
+**Prerequisites**
+
+  * You have installed the OADP Operator. 
+
+
+
+**Procedure**
+
+  * Configure the `spec.imagePullPolicy` field in the DPA as shown in the following example: 
+
+**Example Data Protection Application**
+
+```yaml
+apiVersion: oadp.openshift.io/v1alpha1
+kind: DataProtectionApplication
+metadata:
+  name: test-dpa
+  namespace: openshift-adp
+spec:
+  backupLocations:
+    - name: default
+      velero:
+        config:
+          insecureSkipTLSVerify: "true"
+          profile: "default"
+          region: <bucket_region>
+          s3ForcePathStyle: "true"
+          s3Url: <bucket_url>
+        credential:
+          key: cloud
+          name: cloud-credentials
+        default: true
+        objectStorage:
+          bucket: <bucket_name>
+          prefix: velero
+        provider: aws
+  configuration:
+    nodeAgent:
+      enable: true
+      uploaderType: kopia
+    velero:
+      defaultPlugins:
+        - openshift
+        - aws
+        - kubevirt
+        - csi
+  imagePullPolicy: Never
+```
+
+
+where: 
+
+`imagePullPolicy`
+     Specifies the value for `imagePullPolicy`. In this example, the `imagePullPolicy` field is set to `Never`. 
+
+
+
+
+### 5.13.1.16. About incremental backup support
+
+OADP supports incremental backups of `block` and `Filesystem` persistent volumes for both containerized, and OpenShift Virtualization workloads. The following table summarizes the support for File System Backup (FSB), Container Storage Interface (CSI), and CSI Data Mover: 
+
+Table 5.4. OADP backup support matrix for containerized workloadsVolume mode| FSB - Restic| FSB - Kopia| CSI| CSI Data Mover  
+---|---|---|---|---  
+Filesystem  |  Backup supported, Incremental backup supported  |  Backup supported, Incremental backup supported  |  Backup supported  |  Backup supported, Incremental backup supported   
+Block  |  Not supported  |  Not supported  |  Backup supported  |  Backup supported, Incremental backup supported   
+Show more
+
+Table 5.5. OADP backup support matrix for OpenShift Virtualization workloadsVolume mode| FSB - Restic| FSB - Kopia| CSI| CSI Data Mover  
+---|---|---|---|---  
+Filesystem  |  Not supported  |  Not supported  |  Backup supported  |  Backup supported, Incremental backup supported   
+Block  |  Not supported  |  Not supported  |  Backup supported  |  Backup supported, Incremental backup supported   
+Show more
+
+Note
+
+The CSI Data Mover backups use Kopia regardless of `uploaderType`. 
+
+### 5.13.1.17. Additional resources
+
+  * [Application backup and restore operations](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/backup_and_restore/backup-restore-overview#application-backup-restore-operations-overview_backup-restore-overview "1.2. Application backup and restore operations")
+  * [Backing up applications with File System Backup: Kopia or Restic](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/backup_and_restore/oadp-application-backup-and-restore#oadp-backing-up-applications-restic-doc "5.18.6. Backing up applications with File System Backup: Kopia or Restic")
+  * [OADP plugins](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/backup_and_restore/oadp-application-backup-and-restore#oadp-plugins_oadp-features-plugins "5.4.2. OADP plugins")
+  * [`Backup` custom resource (CR)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/backup_and_restore/oadp-application-backup-and-restore#backing-up-applications "5.18.1. Backing up applications")
+  * [`Restore` CR](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/backup_and_restore/oadp-application-backup-and-restore#restoring-applications "5.19.1. Restoring applications")
+  * [Using Operator Lifecycle Manager in disconnected environments](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/disconnected_environments/#olm-restricted-networks)
+  * [Velero 1.16](https://velero.io/docs/v1.16)

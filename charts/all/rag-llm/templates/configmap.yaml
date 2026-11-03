@@ -6,3 +6,16 @@ metadata:
 data:
   config.yaml: |-
     {{- tpl ($.Files.Get "files/config.yaml") . | nindent 4 }}
+
+{{- if and .Values.populateDbJob .Values.populateDbJob.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rag-llm.fullname" . }}-portal-loader
+data:
+  portal_loader.py: |
+    {{- .Files.Get "files/portal_loader.py" | nindent 4 }}
+  populate.py: |
+    {{- .Files.Get "files/populate.py" | nindent 4 }}
+{{- end }}

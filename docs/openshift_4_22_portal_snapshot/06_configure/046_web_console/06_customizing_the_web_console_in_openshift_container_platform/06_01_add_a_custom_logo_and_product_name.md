@@ -1,0 +1,74 @@
+# 6.1. Add a custom logo and product name
+
+You can create custom branding by adding a custom logo or custom product name. You can set both or one without the other, as these settings are independent of each other. 
+
+**Prerequisites**
+
+  * You must have administrator privileges. 
+  * Create a file of the logo that you want to use. The logo can be a file in any common image format, including GIF, JPG, PNG, or SVG, and is constrained to a `max-height` of `60px`. Image size must not exceed 1 MB due to constraints on the `ConfigMap` object size. 
+
+
+
+**Procedure**
+
+  1. Import your logo file into a config map in the `openshift-config` namespace: 
+
+```shell-session
+$ oc create configmap console-custom-logo --from-file /path/to/console-custom-logo.png -n openshift-config
+```
+
+
+Tip
+
+You can alternatively apply the following YAML to create the config map: 
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: console-custom-logo
+  namespace: openshift-config
+binaryData:
+  console-custom-logo.png: <base64-encoded_logo> ...
+```
+
+
+Replace `<base64-encoded_logo>` with a base64-encoded string of the logo. 
+
+  2. Edit the web console’s Operator configuration to include `customLogoFile` and `customProductName`: 
+
+```shell-session
+$ oc edit consoles.operator.openshift.io cluster
+```
+
+
+```yaml
+apiVersion: operator.openshift.io/v1
+kind: Console
+metadata:
+  name: cluster
+spec:
+  customization:
+    customLogoFile:
+      key: console-custom-logo.png
+      name: console-custom-logo
+    customProductName: My Console
+```
+
+
+Once the Operator configuration is updated, it will sync the custom logo config map into the console namespace, mount it to the console pod, and redeploy. 
+
+  3. Check for success. If there are any issues, the console cluster Operator will report a `Degraded` status, and the console Operator configuration will also report a `CustomLogoDegraded` status, but with reasons such as `KeyOrFilenameInvalid` or `NoImageProvided`. 
+
+To check the `clusteroperator`, run: 
+
+```shell-session
+$ oc get clusteroperator console -o yaml
+```
+
+
+To check the console Operator configuration, run: 
+
+```shell-session
+$ oc get consoles.operator.openshift.io -o yaml
+```

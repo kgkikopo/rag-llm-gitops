@@ -1,0 +1,116 @@
+# 9.16. Configuring a dedicated network for live migration
+
+You can configure a dedicated secondary network for live migration. A dedicated network minimizes the effects of network saturation on tenant workloads during live migration. 
+
+## 9.16.1. Configure a dedicated secondary network for live migration
+
+Configure a dedicated secondary network for live migration to minimize the effects of network saturation on tenant workloads during live migration. 
+
+**Prerequisites**
+
+  * You installed the OpenShift CLI (`oc`). 
+  * You logged in to the cluster as a user with the `cluster-admin` role. 
+  * Each node has at least two Network Interface Cards (NICs). 
+  * The NICs for live migration are connected to the same VLAN. 
+  * You have configured a Linux bridge network. 
+
+
+
+**Procedure**
+
+  1. Create a `NetworkAttachmentDefinition` manifest according to the following example: 
+
+```yaml
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: my-secondary-network
+  namespace: openshift-cnv
+spec:
+  config: '{
+    "cniVersion": "0.3.1",
+    "name": "migration-bridge",
+    "type": "macvlan",
+    "master": "eth1",
+    "mode": "bridge",
+    "ipam": {
+      "type": "whereabouts",
+      "range": "10.200.5.0/24"
+    }
+  }'
+```
+
+
+     * `metadata.name`: Defines the name of the `NetworkAttachmentDefinition` object. 
+     * `config.master`: Defines the name of the NIC to be used for live migration. 
+     * `config.type`: Defines the name of the CNI plugin that provides the network for the `NetworkAttachmentDefinition`. 
+     * `config.range`: Defines an IP address range for the secondary network. This range must not overlap the IP addresses of the main network. 
+
+  2. Open the `HyperConverged` CR in your default editor by running the following command: 
+
+```shell-session
+$ oc edit hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv
+```
+
+
+  3. Add the name of the `NetworkAttachmentDefinition` object to the `spec.virtualization.liveMigrationConfig` stanza of the `HyperConverged` CR. 
+
+Example `HyperConverged` manifest: 
+
+```yaml
+apiVersion: hco.kubevirt.io/v1
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+spec:
+  virtualization:
+    liveMigrationConfig:
+      completionTimeoutPerGiB: 800
+      network: <network>
+      parallelMigrationsPerCluster: 5
+      parallelOutboundMigrationsPerNode: 2
+      progressTimeout: 150
+# ...
+```
+
+
+     * `spec.virtualization.liveMigrationConfig.network`: Defines the name of the Multus `NetworkAttachmentDefinition` object to be used for live migrations. 
+
+  4. Save your changes and exit the editor. The `virt-handler` pods restart and connect to the secondary network. 
+
+
+
+**Verification**
+
+  * When the node that the virtual machine runs on is placed into maintenance mode, the VM automatically migrates to another node in the cluster. You can verify that the migration occurred over the secondary network and not the default pod network by checking the target IP address in the virtual machine instance (VMI) metadata. 
+
+```shell-session
+$ oc get vmi <vmi_name> -o jsonpath='{.status.migrationState.targetNodeAddress}'
+```
+
+
+## 9.16.2. Select a dedicated migration network by using the web console
+
+You can select a dedicated network for live migration by using the OpenShift Container Platform web console. 
+
+**Prerequisites**
+
+  * You configured a Multus network for live migration. 
+  * You created a network attachment definition for the network. 
+
+
+
+**Procedure**
+
+  1. Go to **Virtualization Settings** in the OpenShift Container Platform web console. 
+  2. On the **Cluster** tab, click **General settiings**. 
+  3. Click **Live Migration**. 
+  4. Select the network from the **Live migration network** list. 
+
+
+
+## 9.16.3. Additional resources
+
+  * [Configuring live migration limits and timeouts](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/live-migration#virt-configuring-live-migration "11.2. Configuring live migration")
+  * [Connecting a VM to a Linux bridge network](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/networking#virt-connecting-vm-to-linux-bridge "9.7. Connecting a virtual machine to a Linux bridge network")

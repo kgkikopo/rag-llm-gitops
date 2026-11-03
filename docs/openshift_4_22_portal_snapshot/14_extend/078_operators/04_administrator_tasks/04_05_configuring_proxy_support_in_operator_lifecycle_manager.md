@@ -1,0 +1,192 @@
+# 4.5. Configuring proxy support in Operator Lifecycle Manager
+
+If a global proxy is configured on your OpenShift Container Platform cluster, Operator Lifecycle Manager (OLM) automatically configures Operators that it manages with the cluster-wide proxy. However, you can also configure installed Operators to override the global proxy or inject a custom CA certificate. 
+
+**Additional resources**
+
+  * [Configuring the cluster-wide proxy](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/configuring_network_settings/#enable-cluster-wide-proxy)
+
+
+
+  * [Configuring a custom PKI (custom CA certificate)](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/configuring_network_settings/#configuring-a-custom-pki)
+
+
+
+## 4.5.1. Overriding proxy settings of an Operator
+
+If a cluster-wide egress proxy is configured, Operators running with Operator Lifecycle Manager (OLM) inherit the cluster-wide proxy settings on their deployments. Cluster administrators can also override these proxy settings by configuring the subscription of an Operator. 
+
+Important
+
+Operators must handle setting environment variables for proxy settings in the pods for any managed Operands. 
+
+**Prerequisites**
+
+  * Access to an OpenShift Container Platform cluster using an account with `cluster-admin` permissions. 
+
+
+
+**Procedure**
+
+  1. Navigate in the web console to the **Ecosystem Software Catalog** page. 
+  2. Select the Operator and click **Install**. 
+  3. On the **Install Operator** page, modify the `Subscription` object to include one or more of the following environment variables in the `spec` section: 
+
+     * `HTTP_PROXY`
+     * `HTTPS_PROXY`
+     * `NO_PROXY`
+
+For example: 
+
+**`Subscription` object with proxy setting overrides**
+
+```yaml
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: etcd-config-test
+  namespace: openshift-operators
+spec:
+  config:
+    env:
+    - name: HTTP_PROXY
+      value: test_http
+    - name: HTTPS_PROXY
+      value: test_https
+    - name: NO_PROXY
+      value: test
+  channel: clusterwide-alpha
+  installPlanApproval: Automatic
+  name: etcd
+  source: community-operators
+  sourceNamespace: openshift-marketplace
+  startingCSV: etcdoperator.v0.9.4-clusterwide
+```
+
+
+Note
+
+These environment variables can also be unset using an empty value to remove any previously set cluster-wide or custom proxy settings. 
+
+OLM handles these environment variables as a unit; if at least one of them is set, all three are considered overridden and the cluster-wide defaults are not used for the deployments of the subscribed Operator. 
+
+  4. Click **Install** to make the Operator available to the selected namespaces. 
+  5. After the CSV for the Operator appears in the relevant namespace, you can verify that custom proxy environment variables are set in the deployment. For example, using the CLI: 
+
+```shell-session
+$ oc get deployment -n openshift-operators \
+    etcd-operator -o yaml \
+    | grep -i "PROXY" -A 2
+```
+
+
+**Example output**
+
+```shell-session
+        - name: HTTP_PROXY
+          value: test_http
+        - name: HTTPS_PROXY
+          value: test_https
+        - name: NO_PROXY
+          value: test
+        image: quay.io/coreos/etcd-operator@sha256:66a37fd61a06a43969854ee6d3e21088a98b93838e284a6086b13917f96b0d9c
+...
+```
+
+
+## 4.5.2. Injecting a custom CA certificate
+
+When a cluster administrator adds a custom CA certificate to a cluster using a config map, the Cluster Network Operator merges the user-provided certificates and system CA certificates into a single bundle. 
+
+You can inject this merged bundle into your Operator running on Operator Lifecycle Manager (OLM), which is useful if you have a man-in-the-middle HTTPS proxy. 
+
+**Prerequisites**
+
+  * Access to an OpenShift Container Platform cluster using an account with `cluster-admin` permissions. 
+  * Custom CA certificate added to the cluster using a config map. 
+  * Desired Operator installed and running on OLM. 
+
+
+
+**Procedure**
+
+  1. Create an empty config map in the namespace where the subscription for your Operator exists and include the following label: 
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: trusted-ca
+  labels:
+    config.openshift.io/inject-trusted-cabundle: "true"
+```
+
+
+where: 
+
+`metadata.name`
+     Specifies the name of the config map. 
+`metadata.labels.config.openshift.io/inject-trusted-cabundle`
+    
+
+Requests the Cluster Network Operator to inject the merged bundle when set to `"true"`. 
+
+After creating this config map, it is immediately populated with the certificate contents of the merged bundle. 
+
+  2. Update the `Subscription` object to include a `spec.config` section that mounts the `trusted-ca` config map as a volume to each container within a pod that requires a custom CA: 
+
+```yaml
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: my-operator
+spec:
+  package: etcd
+  channel: alpha
+  config:
+    selector:
+      matchLabels:
+        <labels_for_pods>
+    volumes:
+    - name: trusted-ca
+      configMap:
+        name: trusted-ca
+        items:
+          - key: ca-bundle.crt
+            path: tls-ca-bundle.pem
+    volumeMounts:
+    - name: trusted-ca
+      mountPath: /etc/pki/ca-trust/extracted/pem
+      readOnly: true
+```
+
+
+where: 
+
+`spec.config`
+     Specifies the configuration section. Add a `config` section if it does not exist. 
+`spec.config.selector.matchLabels`
+     Specifies labels to match pods that are owned by the Operator. 
+`spec.config.volumes`
+     Creates a `trusted-ca` volume. 
+`spec.config.volumes[].configMap.items[].key`
+     Specifies the config map key. `ca-bundle.crt` is required as the config map key. 
+`spec.config.volumes[].configMap.items[].path`
+     Specifies the config map path. `tls-ca-bundle.pem` is required as the config map path. 
+`spec.config.volumeMounts`
+    
+
+Creates a `trusted-ca` volume mount. 
+
+Note
+
+Deployments of an Operator can fail to validate the authority and display a `x509 certificate signed by unknown authority` error. This error can occur even after injecting a custom CA when using the subscription of an Operator. In this case, you can set the `mountPath` as `/etc/ssl/certs` for trusted-ca by using the subscription of an Operator. 
+
+
+
+
+## 4.5.3. Additional resources
+
+  * [Proxy certificates](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/#proxy-certificates)
+  * [Replacing the default ingress certificate](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/#replacing-default-ingress)
+  * [Updating the CA bundle](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/#updating-ca-bundle)

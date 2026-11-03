@@ -1,0 +1,43 @@
+# 13.3. Pruning deployment resources
+
+Delete completed or failed deployment configurations and pod records to free up cluster storage, reduce database clutter, and speed up resource lookups. 
+
+You can prune resources associated with deployments that are no longer required by the system, due to age and status. 
+
+The following command prunes replication controllers associated with `DeploymentConfig` objects: 
+
+```shell-session
+$ oc adm prune deployments [<options>]
+```
+
+
+Note
+
+To also prune replica sets associated with `Deployment` objects, use the `--replica-sets` flag. This flag is currently a Technology Preview feature. 
+
+Table 13.2. oc adm prune deployments flagsOption| Description  
+---|---  
+`--confirm` |  Indicate that pruning should occur, instead of performing a dry-run.   
+`--keep-complete=<N>` |  Per the `DeploymentConfig` object, keep the last `N` replication controllers that have a status of `Complete` and replica count of zero. The default is `5`.   
+`--keep-failed=<N>` |  Per the `DeploymentConfig` object, keep the last `N` replication controllers that have a status of `Failed` and replica count of zero. The default is `1`.   
+`--keep-younger-than=<duration>` |  Do not prune any replication controller that is younger than `<duration>` relative to the current time. Valid units of measurement include nanoseconds (`ns`), microseconds (`us`), milliseconds (`ms`), seconds (`s`), minutes (`m`), and hours (`h`). The default is `60m`.   
+`--orphans` |  Prune all replication controllers that no longer have a `DeploymentConfig` object, has status of `Complete` or `Failed`, and has a replica count of zero.   
+`--replica-sets=true|false` |  If `true`, replica sets are included in the pruning process. The default is `false`.  Important This flag is a Technology Preview feature.   
+Show more
+
+**Procedure**
+
+  1. To see what a pruning operation would delete, run the following command: 
+
+```shell-session
+$ oc adm prune deployments --orphans --keep-complete=5 --keep-failed=1 \
+    --keep-younger-than=60m
+```
+
+
+  2. To actually perform the prune operation, add the `--confirm` flag: 
+
+```shell-session
+$ oc adm prune deployments --orphans --keep-complete=5 --keep-failed=1 \
+    --keep-younger-than=60m --confirm
+```

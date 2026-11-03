@@ -1,0 +1,9 @@
+# 7.2. Traffic authentication and encryption
+
+Ensure that all traffic on the wire is encrypted and the endpoints are identifiable. An example of this is Mutual TLS, or mTLS, which is a method for mutual authentication. 
+
+Leverage: 
+
+  * OpenShift Container Platform: With transparent [pod-to-pod IPsec](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/network_security/configuring-ipsec-ovn#pod-to-pod-ipsec_configuring-ipsec-ovn "6.5. IPsec encryption for pod-to-pod traffic"), the source and destination of the traffic can be identified by the IP address. There is the capability for egress traffic to be [encrypted using IPsec](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/network_security/configuring-ipsec-ovn#nw-ovn-ipsec-north-south-enable_configuring-ipsec-ovn "6.8. Configure IPsec encryption for external traffic"). By using the [egress IP](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/ovn-kubernetes_network_plugin/#configuring-egress-ips-ovn) feature, the source IP address of the traffic can be used to identify the source of the traffic inside the cluster. 
+  * [Red Hat OpenShift Service Mesh](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/service_mesh/#ossm-about): Provides powerful [mTLS capabilities](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/service_mesh/#ossm-security-mtls_ossm-security) that can transparently augment traffic leaving a pod to provide authentication and encryption. 
+  * [OpenShift cert-manager Operator](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/#cert-manager-operator-about): Use custom resource definitions (CRDs) to request certificates that can be mounted for your programs to use for SSL/TLS protocols.

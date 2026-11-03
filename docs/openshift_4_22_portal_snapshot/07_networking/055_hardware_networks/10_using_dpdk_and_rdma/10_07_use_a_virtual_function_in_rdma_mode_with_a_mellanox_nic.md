@@ -1,0 +1,165 @@
+# 10.7. Use a virtual function in RDMA mode with a Mellanox NIC
+
+Important
+
+RDMA over Converged Ethernet (RoCE) is a Technology Preview feature only. Technology Preview features are not supported with Red Hat production service level agreements (SLAs) and might not be functionally complete. Red Hat does not recommend using them in production. These features provide early access to upcoming product features, enabling customers to test functionality and provide feedback during the development process. 
+
+For more information about the support scope of Red Hat Technology Preview features, see [Technology Preview Features Support Scope](https://access.redhat.com/support/offerings/techpreview/). 
+
+RDMA over Converged Ethernet (RoCE) is the only supported mode when using RDMA on OpenShift Container Platform. 
+
+**Prerequisites**
+
+  * Install the OpenShift CLI (`oc`). 
+  * Install the SR-IOV Network Operator. 
+  * Log in as a user with `cluster-admin` privileges. 
+
+
+
+**Procedure**
+
+  1. Create the following `SriovNetworkNodePolicy` object, and then save the YAML in the `mlx-rdma-node-policy.yaml` file. 
+
+```yaml
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: mlx-rdma-node-policy
+  namespace: openshift-sriov-network-operator
+spec:
+  resourceName: mlxnics
+  nodeSelector:
+    feature.node.kubernetes.io/network-sriov.capable: "true"
+  priority: <priority>
+  numVfs: <num>
+  nicSelector:
+    vendor: "15b3"
+    deviceID: "1015"
+    pfNames: ["<pf_name>", ...]
+    rootDevices: ["<pci_bus_id>", "..."]
+  deviceType: netdevice
+  isRdma: true
+```
+
+
+where: 
+
+`spec.nicSelector.deviceID`
+     Specifies the device hex code of the SR-IOV network device. 
+`spec.deviceType`
+     Specifies the driver type for the virtual functions. Set to `netdevice` for Mellanox NICs. 
+`spec.isRdma`
+    
+
+Set to `true` to enable RDMA mode. 
+
+Note
+
+See the `Configuring SR-IOV network devices` section for a detailed explanation on each option in `SriovNetworkNodePolicy`. 
+
+When applying the configuration specified in a `SriovNetworkNodePolicy` object, the SR-IOV Operator might drain the nodes, and in some cases, reboot nodes. It might take several minutes for a configuration change to apply. Ensure that there are enough available nodes in your cluster to handle the evicted workload beforehand. 
+
+After the configuration update is applied, all the pods in the `openshift-sriov-network-operator` namespace will change to a `Running` status. 
+
+  2. Create the `SriovNetworkNodePolicy` object by running the following command: 
+
+```shell-session
+$ oc create -f mlx-rdma-node-policy.yaml
+```
+
+
+  3. Create the following `SriovNetwork` object, and then save the YAML in the `mlx-rdma-network.yaml` file. 
+
+```yaml
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
+metadata:
+  name: mlx-rdma-network
+  namespace: openshift-sriov-network-operator
+spec:
+  networkNamespace: <target_namespace>
+  ipam: |-
+# ...
+  vlan: <vlan>
+  resourceName: mlxnics
+```
+
+
+where: 
+
+`spec.ipam`
+    
+
+Specifies a configuration object for the IPAM CNI plugin as a YAML block scalar. The plugin manages IP address assignment for the attachment definition. 
+
+Note
+
+See the "Configuring SR-IOV additional network" section for a detailed explanation on each option in `SriovNetwork`. 
+
+An optional library, app-netutil, provides several API methods for gathering network information about a container’s parent pod. 
+
+  4. Create the `SriovNetworkNodePolicy` object by running the following command: 
+
+```shell-session
+$ oc create -f mlx-rdma-network.yaml
+```
+
+
+  5. Create the following `Pod` spec, and then save the YAML in the `mlx-rdma-pod.yaml` file. 
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: rdma-app
+  namespace: <target_namespace>
+  annotations:
+    k8s.v1.cni.cncf.io/networks: mlx-rdma-network
+spec:
+  containers:
+  - name: testpmd
+    image: <RDMA_image>
+    securityContext:
+      runAsUser: 0
+      capabilities:
+        add: ["IPC_LOCK","SYS_RESOURCE","NET_RAW"]
+    volumeMounts:
+    - mountPath: /mnt/huge
+      name: hugepage
+    resources:
+      limits:
+        memory: "1Gi"
+        cpu: "4"
+        hugepages-1Gi: "4Gi"
+      requests:
+        memory: "1Gi"
+        cpu: "4"
+        hugepages-1Gi: "4Gi"
+    command: ["sleep", "infinity"]
+  volumes:
+  - name: hugepage
+    emptyDir:
+      medium: HugePages
+```
+
+
+where: 
+
+`metadata.namespace`
+     Specifies the same namespace where `SriovNetwork` object `mlx-rdma-network` is created. If you want to create the pod in a different namespace, change `target_namespace` in both the `Pod` spec and the `SriovNetwork` object. 
+`spec.containers.image`
+     Specifies the RDMA image which includes your application and the RDMA library used by the application. 
+`spec.containers.securityContext.capabilities.add`
+     Specifies additional capabilities required by the application inside the container for hugepage allocation, system resource allocation, and network interface access. 
+`spec.containers.volumeMounts.mountPath`
+     Specifies the path where the hugepage volume is mounted in the RDMA pod. The hugepage volume is backed by the `emptyDir` volume type with the medium being `HugePages`. 
+`spec.containers.resources.limits.cpu`
+     Specifies the number of CPUs. The RDMA pod usually requires exclusive CPUs be allocated from the kubelet. This is achieved by setting CPU Manager policy to `static` and creating a pod with `Guaranteed` QoS. 
+`spec.containers.resources.limits.hugepages-1Gi`
+     Specifies the hugepage size (`hugepages-1Gi` or `hugepages-2Mi`) and the quantity of hugepages that will be allocated to the RDMA pod. Configure `2Mi` and `1Gi` hugepages separately. Configuring `1Gi` hugepage requires adding kernel arguments to Nodes. 
+
+  6. Create the RDMA pod by running the following command: 
+
+```shell-session
+$ oc create -f mlx-rdma-pod.yaml
+```

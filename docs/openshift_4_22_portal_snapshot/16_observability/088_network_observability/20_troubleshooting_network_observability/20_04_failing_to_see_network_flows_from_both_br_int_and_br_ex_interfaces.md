@@ -1,0 +1,36 @@
+# 20.4. Failing to see network flows from both br-int and br-ex interfaces
+
+Resolve issues with missing network flows by removing interface restrictions on virtual bridge devices like `br-int` and `br-ex`, ensuring the eBPF agent can attach to the appropriate Layer 3 interfaces. 
+
+`br-ex` and `br-int` are virtual bridge devices operated at OSI layer 2. The eBPF agent works at the IP and TCP levels, layers 3 and 4 respectively. You can expect that the eBPF agent captures the network traffic passing through `br-ex` and `br-int`, when the network traffic is processed by other interfaces such as physical host or virtual pod interfaces. If you restrict the eBPF agent network interfaces to attach only to `br-ex` and `br-int`, you do not see any network flow. 
+
+Manually remove the part in the `interfaces` or `excludeInterfaces` that restricts the network interfaces to `br-int` and `br-ex`. 
+
+**Procedure**
+
+  1. Remove the `interfaces: [ 'br-int', 'br-ex' ]` field. This allows the agent to fetch information from all the interfaces. Alternatively, you can specify the Layer-3 interface for example, `eth0`. Run the following command: 
+
+```shell-session
+$ oc edit -n netobserv flowcollector.yaml -o yaml
+```
+
+
+**Example output**
+
+```plaintext
+apiVersion: flows.netobserv.io/v1alpha1
+kind: FlowCollector
+metadata:
+  name: cluster
+spec:
+  agent:
+    type: EBPF
+    ebpf:
+      interfaces: [ 'br-int', 'br-ex' ]
+```
+
+
+where: 
+
+`spec.agent.ebpf.interfaces`
+     Specifies the network interfaces.

@@ -1,0 +1,96 @@
+# 5.17. Extracting the telco hub reference design configuration CRs
+
+You can extract the complete set of custom resources (CRs) for the telco hub profile from the `openshift-telco-hub-rds-rhel9` container image. The container image has both the required CRs, and the optional CRs, for the telco hub profile. 
+
+**Prerequisites**
+
+  * You have installed `podman`. 
+
+
+
+**Procedure**
+
+  1. Log on to the container image registry with your credentials by running the following command: 
+
+```shell-session
+$ podman login registry.redhat.io
+```
+
+
+  2. Extract the content from the `openshift-telco-hub-rds-rhel9` container image by running the following commands: 
+
+```shell-session
+$ mkdir -p ./out
+```
+
+
+```shell-session
+$ podman run -it registry.redhat.io/openshift4/openshift-telco-hub-rds-rhel9:v4.22 | base64 -d | tar xv -C out
+```
+
+
+**Verification**
+
+  * The `out` directory has the following directory structure. You can view the telco hub CRs in the `out/telco-hub-rds/` directory by running the following command: 
+
+```shell-session
+$ tree -L 4 out/telco-hub-rds/
+```
+
+
+**Example output**
+
+```plaintext
+out/telco-hub-rds/
+├── configuration
+│   ├── example-overlays-config
+│   │   ├── acm
+│   │   │   ├── acmMirrorRegistryCM-patch.yaml
+│   │   │   ├── kustomization.yaml
+│   │   │   ├── options-agentserviceconfig-patch.yaml
+│   │   │   └── storage-mco-patch.yaml
+│   │   ├── gitops
+│   │   │   ├── argocd-tls-certs-cm-patch.yaml
+│   │   │   ├── init-argocd-app.yaml
+│   │   │   └── kustomization.yaml
+│   │   ├── logging
+│   │   │   ├── cluster-log-forwarder-patch.yaml
+│   │   │   ├── kustomization.yaml
+│   │   │   └── README.md
+│   │   ├── lso
+│   │   │   ├── kustomization.yaml
+│   │   │   └── local-storage-disks-patch.yaml
+│   │   ├── odf
+│   │   │   ├── kustomization.yaml
+│   │   │   └── options-storage-cluster.yaml
+│   │   └── registry
+│   │       ├── catalog-source-image-patch.yaml
+│   │       ├── idms-operator-mirrors-patch.yaml
+│   │       ├── idms-release-mirrors-patch.yaml
+│   │       ├── itms-generic-mirrors-patch.yaml
+│   │       ├── itms-release-mirrors-patch.yaml
+│   │       ├── kustomization.yaml
+│   │       └── registry-ca-patch.yaml
+│   ├── kustomization.yaml
+│   ├── README.md
+│   └── reference-crs
+│       ├── kustomization.yaml
+│       ├── optional
+│       │   ├── logging
+│       │   ├── lso
+│       │   └── odf-internal
+│       └── required
+│           ├── acm
+│           ├── gitops
+│           ├── registry
+│           └── talm
+├── install
+│   ├── mirror-registry
+│   │   ├── imageset-config.yaml
+│   │   └── README.md
+│   └── openshift
+│       ├── agent-config.yaml
+│       └── install-config.yaml
+└── scripts
+    └── check_current_versions.sh
+```

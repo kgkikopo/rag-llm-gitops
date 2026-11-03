@@ -1,0 +1,17 @@
+# Chapter 11. cert-manager Operator for Red Hat OpenShift
+
+- [11.1. cert-manager Operator for Red Hat OpenShift overview](11_01_cert_manager_operator_for_red_hat_openshift_overview.md)
+- [11.2. cert-manager Operator for Red Hat OpenShift release notes](11_02_cert_manager_operator_for_red_hat_openshift_release_notes.md)
+- [11.3. Installing the cert-manager Operator for Red Hat OpenShift](11_03_installing_the_cert_manager_operator_for_red_hat_openshift.md)
+- [11.4. Configuring the egress proxy for the cert-manager Operator for Red Hat OpenShift](11_04_configuring_the_egress_proxy_for_the_cert_manager_operator_for_red_hat_openshift.md)
+- [11.5. Customizing the cert-manager Operator by using the CertManager custom resource](11_05_customizing_the_cert_manager_operator_by_using_the_certmanager_custom_resource.md)
+- [11.6. Authenticating the cert-manager Operator for Red Hat OpenShift](11_06_authenticating_the_cert_manager_operator_for_red_hat_openshift.md)
+- [11.7. Configuring an ACME issuer](11_07_configuring_an_acme_issuer.md)
+- [11.8. Configuring certificates with an issuer](11_08_configuring_certificates_with_an_issuer.md)
+- [11.9. Securing routes with the cert-manager Operator for Red Hat OpenShift](11_09_securing_routes_with_the_cert_manager_operator_for_red_hat_openshift.md)
+- [11.10. Integrating the cert-manager Operator for Red Hat OpenShift with Istio-CSR](11_10_integrating_the_cert_manager_operator_for_red_hat_openshift_with_istio_csr.md)
+- [11.11. Network policy configuration for cert-manager Operator](11_11_network_policy_configuration_for_cert_manager_operator.md)
+- [11.12. Distributing certificates by using trust-manager operand](11_12_distributing_certificates_by_using_trust_manager_operand.md)
+- [11.13. Monitoring cert-manager Operator for Red Hat OpenShift](11_13_monitoring_cert_manager_operator_for_red_hat_openshift.md)
+- [11.14. Configuring log levels for cert-manager and the cert-manager Operator for Red Hat OpenShift](11_14_configuring_log_levels_for_cert_manager_and_the_cert_manager_operator_for_red_hat_openshift.md)
+- [11.15. Uninstalling the cert-manager Operator for Red Hat OpenShift](11_15_uninstalling_the_cert_manager_operator_for_red_hat_openshift.md)

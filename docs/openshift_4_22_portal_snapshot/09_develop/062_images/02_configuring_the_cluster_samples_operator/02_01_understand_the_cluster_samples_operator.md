@@ -1,0 +1,35 @@
+# 2.1. Understand the Cluster Samples Operator
+
+During installation, the Operator creates the default configuration object for itself and then creates the sample image streams and templates, including quick start templates. 
+
+Note
+
+To facilitate image stream imports from other registries that require credentials, a cluster administrator can create any additional secrets that contain the content of a Docker `config.json` file in the `openshift` namespace needed for image import. 
+
+The Cluster Samples Operator configuration is a cluster-wide resource. The deployment of the Operator is within the `openshift-cluster-samples-operator` namespace. 
+
+The image for the Cluster Samples Operator has image stream and template definitions for the associated OpenShift Container Platform release. When each sample is created or updated, the Cluster Samples Operator includes an annotation that denotes the version of OpenShift Container Platform. The Operator uses this annotation to ensure that each sample matches the release version. Samples outside of its inventory are ignored, as are skipped samples. Modifications to any samples that are managed by the Operator, where that version annotation is modified or deleted, are reverted automatically. 
+
+Note
+
+The Jenkins images are part of the image payload from installation and are tagged into the image streams directly. 
+
+The Cluster Samples Operator configuration resource includes a finalizer which cleans up the following upon deletion: 
+
+  * Operator managed image streams. 
+  * Operator managed templates. 
+  * Operator generated configuration resources. 
+  * Cluster status resources. 
+
+
+
+Upon deletion of the samples resource, the Cluster Samples Operator recreates the resource by using the default configuration. 
+
+If the Cluster Samples Operator is removed during installation, you can use the Cluster Samples Operator with an alternate registry so that content can be imported. Then you can set the Cluster Samples Operator to `Managed` to get the samples. For instructions, see "Using the Cluster Samples Operator with an alternate registry". 
+
+For more information about configuring credentials, see "Using image pull secrets". 
+
+**Additional resources**
+
+  * [Using the Cluster Samples Operator with an alternate registry](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/images/samples-operator-alt-registry)
+  * [Using image pull secrets](https://docs.redhat.com/en/documentation/openshift_container_platform/latest/html/images/managing-images#using-image-pull-secrets)

@@ -1,0 +1,78 @@
+# 1.10. Create an IP over InfiniBand interface on nodes
+
+You can install a Red Hat certified third-party Operator, such as the NVIDIA Network Operator, that supports IP over InfiniBand (IPoIB) mode to manage InfiniBand resources in your OpenShift Container Platform cluster. 
+
+To create an IPoIB interface on nodes in your cluster, you must define an InfiniBand (IPoIB) interface in a `NodeNetworkConfigurationPolicy` (NNCP) manifest file. 
+
+If you need to attach IPoIB to a bond interface, only the `active-backup` mode supports this configuration. 
+
+Important
+
+The OpenShift Container Platform documentation describes defining only the IPoIB interface configuration in a `NodeNetworkConfigurationPolicy` (NNCP) manifest file. You must refer to the NVIDIA and other third-party vendor documentation for the majority of the configuring steps. Red Hat support does not extend to anything external to the NNCP configuration. 
+
+For more information about the NVIDIA Operator, see [Getting Started with Red Hat OpenShift](https://docs.nvidia.com/networking/display/kubernetes2410/getting+started+with+red+hat+openshift) (NVIDIA Docs Hub). 
+
+**Prerequisites**
+
+  * You installed a Red Hat certified third-party Operator that supports an IPoIB interface. 
+  * You have installed the OpenShift CLI (`oc`). 
+
+
+
+**Procedure**
+
+  1. Create or edit a `NodeNetworkConfigurationPolicy` (NNCP) manifest file, and then specify an IPoIB interface in the file. 
+
+```yaml
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: worker-0-ipoib
+spec:
+# ...
+    interfaces:
+    - description: ""
+      infiniband:
+        mode: datagram
+        pkey: "0xffff"
+      ipv4:
+        address:
+        - ip: 100.125.3.4
+          prefix-length: 16
+        dhcp: false
+        enabled: true
+      ipv6:
+        enabled: false
+      name: ibp27s0
+      state: up
+      identifier: mac-address
+      mac-address: 20:00:55:04:01:FE:80:00:00:00:00:00:00:00:02:C9:02:00:23:13:92
+      type: infiniband
+# ...
+```
+
+
+where: 
+
+`<mode>`
+     `datagram` is the default mode for an IPoIB interface. This mode provides improved CPU performance and low-latency capabilitities for pod-to-pod communication. `connected` mode is a supported mode but consider only using this mode when you need to adjust the maximum transmission unit (MTU) value to improve node connectivity with surrounding network devices. 
+`<pkey>`
+     Supports a string or an integer value. The parameter defines the protection key, or _P-key_ , for the interface for the purposes of authentication and encrypted communications with a third-party vendor, such as NVIDIA. Values `None` and `0xffff` indicate the protection key for the base interface in an InfiniBand system. 
+`<identifier>`
+     Supported values include `name`, the default value, and `mac-address`. The `name` value applies a configuration to an interface that holds a specified interface name. 
+`<mac-address>`
+     Holds the MAC address of an interface. For an IP-over-InfiniBand (IPoIB) interface, the address is a 20-byte string. 
+`<type>`
+     Sets the type of interface to `infiniband`. 
+
+  2. Apply the NNCP configuration to each node in your cluster by running the following command. The Kubernetes NMState Operator can then create an IPoIB interface on each node. 
+
+```yaml
+$ oc apply -f <nncp_file_name>
+```
+
+
+where: 
+
+`<nncp_file_name>`
+     Replace `<nncp_file_name>` with the name of your NNCP file.

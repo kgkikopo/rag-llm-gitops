@@ -1,0 +1,10 @@
+# 9.1. High performance multicast
+
+The OVN-Kubernetes network plugin supports multicast between pods on the default network. This is best used for low-bandwidth coordination or service discovery, and not high-bandwidth applications. 
+
+For applications such as streaming media, such as Internet Protocol television (IPTV) and multipoint videoconferencing, you can use Single Root I/O Virtualization (SR-IOV) hardware to provide near-native performance. 
+
+When using additional SR-IOV interfaces for multicast: 
+
+  * Multicast packages must be sent or received by a pod through the additional SR-IOV interface. 
+  * The physical network which connects the SR-IOV interfaces decides the multicast routing and topology, which is not controlled by OpenShift Container Platform.

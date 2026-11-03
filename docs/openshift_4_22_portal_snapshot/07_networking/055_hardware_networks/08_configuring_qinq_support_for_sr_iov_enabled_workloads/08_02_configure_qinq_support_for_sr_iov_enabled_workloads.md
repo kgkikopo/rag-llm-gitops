@@ -1,0 +1,172 @@
+# 8.2. Configure QinQ support for SR-IOV enabled workloads
+
+Configure QinQ support for SR-IOV enabled workloads to enable double VLAN tagging on your cluster. 
+
+**Prerequisites**
+
+  * You have installed the OpenShift CLI (`oc`). 
+  * You have access to the cluster as a user with the `cluster-admin` role. 
+  * You have installed the SR-IOV Network Operator. 
+
+
+
+**Procedure**
+
+  1. Create a file named `sriovnetpolicy-810-sriov-node-network.yaml` by using the following content: 
+
+```yaml
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetworkNodePolicy
+metadata:
+  name: sriovnetpolicy-810
+  namespace: openshift-sriov-network-operator
+spec:
+  deviceType: netdevice
+  nicSelector:
+    pfNames:
+      - ens5f0#0-9
+  nodeSelector:
+    node-role.kubernetes.io/worker-cnf: ""
+  numVfs: 10
+  priority: 99
+  resourceName: resource810
+```
+
+
+  2. Create the `SriovNetworkNodePolicy` object by running the following command: 
+
+```shell-session
+$ oc create -f sriovnetpolicy-810-sriov-node-network.yaml
+```
+
+
+  3. Open a separate terminal window and monitor the synchronization status of the SR-IOV network node state for the node specified in the `openshift-sriov-network-operator` namespace by running the following command: 
+
+```shell-session
+$ watch -n 1 'oc get sriovnetworknodestates -n openshift-sriov-network-operator <node_name> -o jsonpath="{.status.syncStatus}"'
+```
+
+
+The synchronization status indicates a change from `InProgress` to `Succeeded`. 
+
+  4. Create a `SriovNetwork` object, and set the outer VLAN called the S-tag, or `Service Tag`, as it belongs to the infrastructure. 
+
+Important
+
+You must configure the VLAN on the trunk interface of the switch. In addition, you might need to further configure some switches to support QinQ tagging. 
+
+     1. Create a file named `nad-sriovnetwork-1ad-810.yaml` by using the following content: 
+
+```yaml
+apiVersion: sriovnetwork.openshift.io/v1
+kind: SriovNetwork
+metadata:
+  name: sriovnetwork-1ad-810
+  namespace: openshift-sriov-network-operator
+spec:
+  ipam: '{}'
+  vlan: <vlan_id>
+  vlanProto: <vlan_protocol>
+  networkNamespace: default
+  resourceName: resource810
+```
+
+
+        * `<vlan_id>` specifies the S-tag VLAN tag, for example `171`. 
+        * `<vlan_protocol>` specifies the VLAN protocol to assign to the virtual function (VF). Supported values are `802.1ad` and `802.1q`. The default value is `802.1q`. 
+
+     2. Create the object by running the following command: 
+
+```shell-session
+$ oc create -f nad-sriovnetwork-1ad-810.yaml
+```
+
+
+  5. Create a `NetworkAttachmentDefinition` object with an inner VLAN. The inner VLAN is often referred to as the C-tag, or `Customer Tag`, as it belongs to the Network Function: 
+
+     1. Create a file named `nad-cvlan100.yaml` by using the following content: 
+
+```yaml
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: nad-cvlan100
+  namespace: default
+spec:
+  config: '{
+    "name": "vlan-100",
+    "cniVersion": "0.3.1",
+    "type": "vlan",
+    "linkInContainer": true,
+    "master": "<vf_interface>",
+    "vlanId": 100,
+    "ipam": {"type": "static"}
+  }'
+```
+
+
+        * `<vf_interface>` specifies the VF interface inside the pod. The default name is `net1` because the name is not set in the pod annotation. 
+
+     2. Apply the YAML file by running the following command: 
+
+```shell-session
+$ oc apply -f nad-cvlan100.yaml
+```
+
+
+**Verification**
+
+  * Verify QinQ is active on the node by following this procedure: 
+
+    1. Create a file named `test-qinq-pod.yaml` by using the following content: 
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  annotations:
+    k8s.v1.cni.cncf.io/networks: sriovnetwork-1ad-810, nad-cvlan100
+spec:
+  containers:
+    - name: test-container
+      image: quay.io/ocp-edge-qe/cnf-gotests-client:v4.10
+      imagePullPolicy: Always
+      securityContext:
+        privileged: true
+```
+
+
+    2. Create the test pod by running the following command: 
+
+```shell-session
+$ oc create -f test-qinq-pod.yaml
+```
+
+
+    3. Enter into a debug session on the target node where the pod is present and display information about the network interface `ens5f0` by running the following command: 
+
+```shell-session
+$ oc debug node/my-cluster-node -- bash -c "ip link show ens5f0"
+```
+
+
+**Example output**
+
+```shell-session
+6: ens5f0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc mq state UP mode DEFAULT group default qlen 1000
+link/ether b4:96:91:a5:22:10 brd ff:ff:ff:ff:ff:ff
+vf 0 link/ether a2:81:ba:d0:6f:f3 brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state auto, trust off
+vf 1 link/ether 8a:bb:0a:36:f2:ed brd ff:ff:ff:ff:ff:ff, vlan 171, vlan protocol 802.1ad, spoof checking on, link-state auto, trust off
+vf 2 link/ether ca:0e:e1:5b:0c:d2 brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state auto, trust off
+vf 3 link/ether ee:6c:e2:f5:2c:70 brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state auto, trust off
+vf 4 link/ether 0a:d6:b7:66:5e:e8 brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state auto, trust off
+vf 5 link/ether da:d5:e7:14:4f:aa brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state auto, trust off
+vf 6 link/ether d6:8e:85:75:12:5c brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state auto, trust off
+vf 7 link/ether d6:eb:ce:9c:ea:78 brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state auto, trust off
+vf 8 link/ether 5e:c5:cc:05:93:3c brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state auto, trust on
+vf 9 link/ether a6:5a:7c:1c:2a:16 brd ff:ff:ff:ff:ff:ff, spoof checking on, link-state auto, trust off
+```
+
+
+The `vlan protocol 802.1ad` ID in the output indicates that the interface supports VLAN tagging with protocol 802.1ad (QinQ). The VLAN ID is 171.

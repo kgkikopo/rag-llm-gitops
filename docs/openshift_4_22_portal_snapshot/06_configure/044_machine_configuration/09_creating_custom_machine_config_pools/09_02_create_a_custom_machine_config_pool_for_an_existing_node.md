@@ -1,0 +1,101 @@
+# 9.2. Create a custom machine config pool for an existing node
+
+You can create custom machine config pools (MCP) and manually add an existing node into that pool. With custom machine config pools, you can deploy changes targeted at the nodes in the custom pool. 
+
+The following procedure shows you how to create a new custom machine config pool and add an existing node into that pool. 
+
+**Procedure**
+
+  1. Create a custom machine config pool: 
+
+     1. Create a YAML file similar to the following: 
+
+```yaml
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfigPool
+metadata:
+  name: custom
+spec:
+  machineConfigSelector:
+    matchExpressions:
+      - {key: machineconfiguration.openshift.io/role, operator: In, values: [custom,worker]}
+  nodeSelector:
+    matchLabels:
+      node-role.kubernetes.io/custom: ""
+```
+
+
+where: 
+
+`metadata.name`
+     Specifies a name for the machine config pool. 
+`spec.machineConfigSelector.matchExpressions`
+     Specifies the node roles for the new node. This must include the `worker` role and the custom role. 
+`spec.nodeSelector.matchLabels`
+     Specifies a node selector to use when adding nodes to this pool. 
+
+     2. Create the machine config pool by running the following command: 
+
+```shell-session
+$ oc create -f <file_name>.yaml
+```
+
+
+  2. Add a label to the worker nodes that you want to move to the new custom pool by running the following command: 
+
+```shell-session
+$ oc label node <node_name> <node_selector>
+```
+
+
+Replace `<node_name>` with the name of the node that you want to move and replace `<node-selector>` with the node selector you added to the machine config pool. 
+
+**Example command**
+
+```shell-session
+$ oc label node ci-ln-g5tpp5k-72292-hz2mw-worker-b-ps8xh node-role.kubernetes.io/custom=""
+```
+
+
+**Verification**
+
+  1. Check to see that the MCO created the new machine config pool by running the following command: 
+
+```shell-session
+$ oc get mcp
+```
+
+
+**Example output**
+
+```shell-session
+NAME      CONFIG                                              UPDATED   UPDATING   DEGRADED   MACHINECOUNT   READYMACHINECOUNT   UPDATEDMACHINECOUNT   DEGRADEDMACHINECOUNT   AGE
+custom    rendered-custom-72be15c95699b6d39f70fce525f51bb2    True      False      False      1              1                   1                     0                      12s
+master    rendered-master-9e25b616b551d6c77f490191f45161d7    True      False      False      3              3                   3                     0                      32m
+worker    rendered-worker-72be15c95699b6d39f70fce525f51bb2    True      False      False      2              2                   2                     0                      32m
+```
+
+
+In this example, `custom` is the new machine config pool. 
+
+  2. Check to see if the node is in that pool by running the following command: 
+
+```shell-session
+$ oc get nodes
+```
+
+
+**Example output**
+
+```shell-session
+NAME                                       STATUS   ROLES                  AGE   VERSION
+ci-ln-i61xqwb-72292-ftjn8-master-0         Ready    control-plane,master   42m   v1.35.3
+ci-ln-i61xqwb-72292-ftjn8-master-1         Ready    control-plane,master   44m   v1.35.3
+ci-ln-i61xqwb-72292-ftjn8-master-2         Ready    control-plane,master   43m   v1.35.3
+ci-ln-g5tpp5k-72292-hz2mw-worker-b-ps8xh   Ready    custom,worker          36m   v1.35.3
+ci-ln-i61xqwb-72292-ftjn8-worker-c-2lhcl   Ready    worker                 36m   v1.35.3
+ci-ln-i61xqwb-72292-ftjn8-worker-f-qgdb7   Ready    worker                 36m   v1.35.3
+```
+
+
+In this example, the `ci-ln-g5tpp5k-72292-hz2mw-worker-b-ps8xh` node is an existing node that was moved to the `custom` machine config pool.

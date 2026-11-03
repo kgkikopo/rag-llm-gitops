@@ -1,0 +1,82 @@
+# 7.3. Create a RuntimeClass object for Windows scheduling
+
+To deploy Windows workloads, you must create a `RuntimeClass` object to map your Windows pods to a base Windows OS variant. 
+
+Using a `RuntimeClass` object simplifies the use of scheduling mechanisms like taints and tolerations; you deploy a runtime class that encapsulates your taints and tolerations and then apply it to your pods to schedule them to the appropriate node. 
+
+Creating a runtime class is also necessary in clusters that support multiple operating system variants. 
+
+**Procedure**
+
+  1. Create a `RuntimeClass` object YAML file. For example, `runtime-class.yaml`: 
+
+```yaml
+apiVersion: node.k8s.io/v1
+kind: RuntimeClass
+metadata:
+  name: windows2025
+handler: 'runhcs-wcow-process'
+scheduling:
+  nodeSelector:
+    kubernetes.io/os: 'windows'
+    kubernetes.io/arch: 'amd64'
+    node.kubernetes.io/windows-build: '10.0.26100'
+  tolerations:
+  - effect: NoSchedule
+    key: os
+    operator: Equal
+    value: "windows"
+  - effect: NoSchedule
+    key: os
+    operator: Equal
+    value: "Windows"
+```
+
+
+where: 
+
+`metadata.name`
+     Specifies the `RuntimeClass` object name, which is defined in the pods you want to be managed by this runtime class. 
+`scheduling.nodeSelector`
+    
+
+Specifies labels that must be present on nodes that support this runtime class. Pods using this runtime class can only be scheduled to a node matched by this selector. The node selector of the runtime class is merged with the existing node selector of the pod. Any conflicts prevent the pod from being scheduled to the node. 
+
+     * For Windows 2025, specify the `node.kubernetes.io/windows-build: '10.0.26100'` label. 
+     * For Windows 2022, specify the `node.kubernetes.io/windows-build: '10.0.20348'` label. 
+     * For Windows 2019, specify the `node.kubernetes.io/windows-build: '10.0.17763'` label. 
+
+`scheduling.tolerations`
+     Specifies tolerations to append to pods, excluding duplicates, running with this runtime class during admission. This combines the set of nodes tolerated by the pod and the runtime class. 
+
+  2. Create the `RuntimeClass` object: 
+
+```shell-session
+$ oc create -f <file-name>.yaml
+```
+
+
+For example: 
+
+```shell-session
+$ oc create -f runtime-class.yaml
+```
+
+
+  3. Apply the `RuntimeClass` object to your pod to ensure it is scheduled to the appropriate operating system variant: 
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-windows-pod
+spec:
+  runtimeClassName: windows2025
+# ...
+```
+
+
+where: 
+
+`spec.runtimeClassName`
+     Specifies the runtime class to manage the scheduling of your pod.

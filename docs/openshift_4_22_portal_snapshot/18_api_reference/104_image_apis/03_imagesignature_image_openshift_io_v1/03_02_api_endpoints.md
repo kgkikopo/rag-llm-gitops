@@ -1,0 +1,64 @@
+# 3.2. API endpoints
+
+The following API endpoints are available: 
+
+  * `/apis/image.openshift.io/v1/imagesignatures`
+
+    * `POST`: create an ImageSignature 
+
+  * `/apis/image.openshift.io/v1/imagesignatures/{name}`
+
+    * `DELETE`: delete an ImageSignature 
+
+
+
+
+## 3.2.1. /apis/image.openshift.io/v1/imagesignatures
+
+Table 3.1. Global query parametersParameter| Type| Description  
+---|---|---  
+`dryRun` |  `string` |  When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed   
+`fieldValidation` |  `string` |  fieldValidation instructs the server on how to handle objects in the request (POST/PUT/PATCH) containing unknown or duplicate fields. Valid values are: - Ignore: This will ignore any unknown fields that are silently dropped from the object, and will ignore all but the last duplicate field that the decoder encounters. This is the default behavior prior to v1.23. - Warn: This will send a warning via the standard warning response header for each unknown field that is dropped from the object, and for each duplicate field that is encountered. The request will still succeed if there are no other errors, and will only persist the last of any duplicate fields. This is the default in v1.23+ - Strict: This will fail the request with a BadRequest error if any unknown fields would be dropped from the object, or if any duplicate fields are present. The error returned from the server will contain all unknown and duplicate fields encountered.   
+Show more
+
+HTTP method
+     `POST`
+Description
+     create an ImageSignature 
+
+Table 3.2. Body parametersParameter| Type| Description  
+---|---|---  
+`body` |  [`ImageSignature`](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/image_apis/imagesignature-image-openshift-io-v1 "Chapter 3. ImageSignature \[image.openshift.io/v1\]") schema  |   
+Show more
+
+Table 3.3. HTTP responsesHTTP code| Reponse body  
+---|---  
+200 - OK  |  [`ImageSignature`](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/image_apis/imagesignature-image-openshift-io-v1 "Chapter 3. ImageSignature \[image.openshift.io/v1\]") schema   
+201 - Created  |  [`ImageSignature`](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/image_apis/imagesignature-image-openshift-io-v1 "Chapter 3. ImageSignature \[image.openshift.io/v1\]") schema   
+202 - Accepted  |  [`ImageSignature`](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/image_apis/imagesignature-image-openshift-io-v1 "Chapter 3. ImageSignature \[image.openshift.io/v1\]") schema   
+401 - Unauthorized  |  Empty   
+Show more
+
+## 3.2.2. /apis/image.openshift.io/v1/imagesignatures/{name}
+
+Table 3.4. Global path parametersParameter| Type| Description  
+---|---|---  
+`name` |  `string` |  name of the ImageSignature   
+Show more
+
+Table 3.5. Global query parametersParameter| Type| Description  
+---|---|---  
+`dryRun` |  `string` |  When present, indicates that modifications should not be persisted. An invalid or unrecognized dryRun directive will result in an error response and no further processing of the request. Valid values are: - All: all dry run stages will be processed   
+Show more
+
+HTTP method
+     `DELETE`
+Description
+     delete an ImageSignature 
+
+Table 3.6. HTTP responsesHTTP code| Reponse body  
+---|---  
+200 - OK  |  [`Status_v2`](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/common_object_reference/#io-k8s-apimachinery-pkg-apis-meta-v1-Status_v2) schema   
+202 - Accepted  |  [`Status_v2`](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/common_object_reference/#io-k8s-apimachinery-pkg-apis-meta-v1-Status_v2) schema   
+401 - Unauthorized  |  Empty   
+Show more

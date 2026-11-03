@@ -1,0 +1,10 @@
+# 7.3. Identification and authentication
+
+After you have the ability to mint certificates using a CA, you can use it to establish trust relationships by verification of the identity of the other end of a connection — either a user or a client machine. This also requires management of certificate lifecycles to limit use if compromised. 
+
+Leverage: 
+
+  * OpenShift Container Platform: Cluster-signed [service certificates](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/#add-service-serving) to ensure that a client is talking to a trusted endpoint. This requires that the service uses SSL/TLS and that the client uses the [cluster CA](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/#add-service-certificate-configmap_service-serving-certificate). The client identity must be provided using some other means. 
+  * [Red Hat Single Sign-On](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/#security-platform-red-hat-sso_security-platform): Provides request authentication integration with enterprise user directories or third-party identity providers. 
+  * [Red Hat OpenShift Service Mesh](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/service_mesh/#ossm-about): [Transparent upgrade](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/service_mesh/#ossm-architecture) of connections to mTLS, auto-rotation, custom certificate expiration, and request authentication with JSON web token (JWT). 
+  * [OpenShift cert-manager Operator](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/#cert-manager-operator-about): Creation and management of certificates for use by your application. Certificates can be controlled by CRDs and mounted as secrets, or your application can be changed to interact directly with the cert-manager API.

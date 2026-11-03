@@ -1,0 +1,84 @@
+# 1.7. About an arbiter node
+
+You can configure an OpenShift Container Platform cluster with two control plane nodes and one arbiter node so as to retain high availability (HA) while reducing infrastructure costs for your cluster. 
+
+An arbiter node is a lower-cost, co-located machine that participates in control plane quorum decisions. Unlike a standard control plane node, the arbiter node does not run the full set of control plane services. You can use this configuration to maintain HA in your cluster with only two fully provisioned control plane nodes instead of three. 
+
+To deploy a cluster with two control plane nodes and one arbiter node, you must define the following nodes in the `install-config.yaml` file: 
+
+  * 2 control plane nodes 
+  * 1 arbiter node 
+
+
+
+The arbiter node must meet the following minimum system requirements: 
+
+  * 2 vCPUs 
+  * 8 GB of RAM 
+  * 50 GB of SSD or equivalent storage 
+  * The arbiter node must be located in a network environment with an end-to-end latency of less than 100 milliseconds, including disk I/O. In high-latency environments, you might need to apply the `etcd` slow profile. 
+
+
+
+The control plane nodes must meet the following minimum system requirements: 
+
+  * 4 vCPUs 
+  * 16 GB of RAM 
+  * 120 GB of SSD or equivalent storage 
+
+
+
+Additionally, the control plane nodes must also have enough storage for the workload. 
+
+**Example`install-config.yaml` configuration for deploying an arbiter node**
+
+```yaml
+apiVersion: v1
+baseDomain: devcluster.openshift.com
+compute:
+  - architecture: amd64
+    hyperthreading: Enabled
+    name: worker
+    platform: {}
+    replicas: 0
+arbiter:
+  architecture: amd64
+  hyperthreading: Enabled
+  replicas: 1
+  name: arbiter
+  platform:
+    baremetal: {}
+controlPlane:
+  architecture: amd64
+  hyperthreading: Enabled
+  name: master
+  platform:
+    baremetal: {}
+  replicas: 2
+platform:
+  baremetal:
+    hosts:
+      - name: cluster-master-0
+        role: master
+# ...
+      - name: cluster-master-1
+        role: master
+        ...
+      - name: cluster-arbiter-0
+        role: arbiter
+# ...
+```
+
+
+where: 
+
+`arbiter`
+     Specifies the arbiter machine pool. You configure this field to deploy a cluster with an arbiter node. 
+`arbiter.replicas`
+     Specifies the `arbiter.replicas` parameter as `1` for the arbiter pool. You cannot set this field to a value that is greater than 1. 
+`arbiter.name`
+     Specifies a name for the arbiter machine pool. 
+`controlPlane`
+     Specifies the control plane machine pool. 
+`controlPlane.replicas`
+     Specifies the `controlPlane.replicas` parameter. When an arbiter pool is defined, two control plane replicas are valid.

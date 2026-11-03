@@ -1,0 +1,12 @@
+# Chapter 4. Controlling pod placement onto nodes (scheduling)
+
+- [4.1. Controlling pod placement using the scheduler](04_01_controlling_pod_placement_using_the_scheduler.md)
+- [4.2. Scheduling pods using a scheduler profile](04_02_scheduling_pods_using_a_scheduler_profile.md)
+- [4.3. Placing pods relative to other pods using affinity and anti-affinity rules](04_03_placing_pods_relative_to_other_pods_using_affinity_and_anti_affinity_rules.md)
+- [4.4. Controlling pod placement on nodes using node affinity rules](04_04_controlling_pod_placement_on_nodes_using_node_affinity_rules.md)
+- [4.5. Placing pods onto overcommited nodes](04_05_placing_pods_onto_overcommited_nodes.md)
+- [4.6. Controlling pod placement using node taints](04_06_controlling_pod_placement_using_node_taints.md)
+- [4.7. Placing pods on specific nodes using node selectors](04_07_placing_pods_on_specific_nodes_using_node_selectors.md)
+- [4.8. Controlling pod placement by using pod topology spread constraints](04_08_controlling_pod_placement_by_using_pod_topology_spread_constraints.md)
+- [4.9. Descheduler](04_09_descheduler.md)
+- [4.10. Secondary scheduler](04_10_secondary_scheduler.md)

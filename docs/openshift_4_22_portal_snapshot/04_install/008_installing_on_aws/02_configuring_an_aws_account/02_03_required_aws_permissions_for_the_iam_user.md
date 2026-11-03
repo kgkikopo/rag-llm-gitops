@@ -1,0 +1,327 @@
+# 2.3. Required AWS permissions for the IAM user
+
+To deploy all components of an OpenShift Container Platform cluster, you must grant all the required permissions to the IAM user that you create in Amazon Web Services (AWS). 
+
+Note
+
+Your IAM user must have the permission `tag:GetResources` in the region `us-east-1` to delete the base cluster resources. As part of the AWS API requirement, the OpenShift Container Platform installation program performs various actions in this region. 
+
+When you attach the `AdministratorAccess` policy to the IAM user that you create in AWS, you grant that user all of the required permissions. To deploy all components of an OpenShift Container Platform cluster, the IAM user requires the following permissions: 
+
+**Required EC2 permissions for installation**
+
+  * `ec2:AttachNetworkInterface`
+  * `ec2:AuthorizeSecurityGroupEgress`
+  * `ec2:AuthorizeSecurityGroupIngress`
+  * `ec2:CopyImage`
+  * `ec2:CreateNetworkInterface`
+  * `ec2:CreateSecurityGroup`
+  * `ec2:CreateTags`
+  * `ec2:CreateVolume`
+  * `ec2:DeleteSecurityGroup`
+  * `ec2:DeleteSnapshot`
+  * `ec2:DeleteTags`
+  * `ec2:DeregisterImage`
+  * `ec2:DescribeAccountAttributes`
+  * `ec2:DescribeAddresses`
+  * `ec2:DescribeAvailabilityZones`
+  * `ec2:DescribeDhcpOptions`
+  * `ec2:DescribeImages`
+  * `ec2:DescribeInstanceAttribute`
+  * `ec2:DescribeInstanceCreditSpecifications`
+  * `ec2:DescribeInstances`
+  * `ec2:DescribeInstanceTypes`
+  * `ec2:DescribeInstanceTypeOfferings`
+  * `ec2:DescribeInternetGateways`
+  * `ec2:DescribeKeyPairs`
+  * `ec2:DescribeNatGateways`
+  * `ec2:DescribeNetworkAcls`
+  * `ec2:DescribeNetworkInterfaces`
+  * `ec2:DescribePrefixLists`
+  * `ec2:DescribePublicIpv4Pools` (only required if you specify `publicIpv4Pool` in `install-config.yaml`) 
+  * `ec2:DescribeRegions`
+  * `ec2:DescribeRouteTables`
+  * `ec2:DescribeSecurityGroupRules`
+  * `ec2:DescribeSecurityGroups`
+  * `ec2:DescribeSubnets`
+  * `ec2:DescribeTags`
+  * `ec2:DescribeVolumes`
+  * `ec2:DescribeVpcAttribute`
+  * `ec2:DescribeVpcClassicLink`
+  * `ec2:DescribeVpcClassicLinkDnsSupport`
+  * `ec2:DescribeVpcEndpoints`
+  * `ec2:DescribeVpcs`
+  * `ec2:DisassociateAddress` (only required if you specify `publicIpv4Pool` in `install-config.yaml`) 
+  * `ec2:GetEbsDefaultKmsKeyId`
+  * `ec2:ModifyInstanceAttribute`
+  * `ec2:ModifyNetworkInterfaceAttribute`
+  * `ec2:RevokeSecurityGroupEgress`
+  * `ec2:RevokeSecurityGroupIngress`
+  * `ec2:RunInstances`
+  * `ec2:TerminateInstances`
+
+
+
+**Required permissions for creating network resources during installation**
+
+  * `ec2:AllocateAddress`
+  * `ec2:AssociateAddress`
+  * `ec2:AssociateDhcpOptions`
+  * `ec2:AssociateRouteTable`
+  * `ec2:AttachInternetGateway`
+  * `ec2:CreateDhcpOptions`
+  * `ec2:CreateInternetGateway`
+  * `ec2:CreateNatGateway`
+  * `ec2:CreateRoute`
+  * `ec2:CreateRouteTable`
+  * `ec2:CreateSubnet`
+  * `ec2:CreateVpc`
+  * `ec2:CreateVpcEndpoint`
+  * `ec2:ModifySubnetAttribute`
+  * `ec2:ModifyVpcAttribute`
+
+
+
+Note
+
+If you use an existing Virtual Private Cloud (VPC), your account does not require these permissions for creating network resources. 
+
+**Required Elastic Load Balancing permissions (ELB) for installation**
+
+  * `elasticloadbalancing:AddTags`
+  * `elasticloadbalancing:ApplySecurityGroupsToLoadBalancer`
+  * `elasticloadbalancing:AttachLoadBalancerToSubnets`
+  * `elasticloadbalancing:ConfigureHealthCheck`
+  * `elasticloadbalancing:CreateListener`
+  * `elasticloadbalancing:CreateLoadBalancer`
+  * `elasticloadbalancing:CreateLoadBalancerListeners`
+  * `elasticloadbalancing:CreateTargetGroup`
+  * `elasticloadbalancing:DeleteLoadBalancer`
+  * `elasticloadbalancing:DeregisterInstancesFromLoadBalancer`
+  * `elasticloadbalancing:DeregisterTargets`
+  * `elasticloadbalancing:DescribeInstanceHealth`
+  * `elasticloadbalancing:DescribeListeners`
+  * `elasticloadbalancing:DescribeLoadBalancerAttributes`
+  * `elasticloadbalancing:DescribeLoadBalancers`
+  * `elasticloadbalancing:DescribeTags`
+  * `elasticloadbalancing:DescribeTargetGroupAttributes`
+  * `elasticloadbalancing:DescribeTargetHealth`
+  * `elasticloadbalancing:ModifyLoadBalancerAttributes`
+  * `elasticloadbalancing:ModifyTargetGroup`
+  * `elasticloadbalancing:ModifyTargetGroupAttributes`
+  * `elasticloadbalancing:RegisterInstancesWithLoadBalancer`
+  * `elasticloadbalancing:RegisterTargets`
+  * `elasticloadbalancing:SetLoadBalancerPoliciesOfListener`
+  * `elasticloadbalancing:SetSecurityGroups`
+
+
+
+Important
+
+OpenShift Container Platform uses both the ELB and ELBv2 API services to provision load balancers. The permission list shows permissions required by both services. A known issue exists in the AWS web console where both services use the same `elasticloadbalancing` action prefix but do not recognize the same actions. You can ignore the warnings about the service not recognizing certain `elasticloadbalancing` actions. 
+
+**Required IAM permissions for installation**
+
+  * `iam:AddRoleToInstanceProfile`
+  * `iam:CreateInstanceProfile`
+  * `iam:CreateRole`
+  * `iam:DeleteInstanceProfile`
+  * `iam:DeleteRole`
+  * `iam:DeleteRolePolicy`
+  * `iam:GetInstanceProfile`
+  * `iam:GetRole`
+  * `iam:GetRolePolicy`
+  * `iam:GetUser`
+  * `iam:ListInstanceProfilesForRole`
+  * `iam:ListRoles`
+  * `iam:ListUsers`
+  * `iam:PassRole`
+  * `iam:PutRolePolicy`
+  * `iam:RemoveRoleFromInstanceProfile`
+  * `iam:SimulatePrincipalPolicy`
+  * `iam:TagInstanceProfile`
+  * `iam:TagRole`
+
+
+
+Note
+
+  * If you specify an existing IAM role in the `install-config.yaml` file, the following IAM permissions are not required: `iam:CreateRole`,`iam:DeleteRole`, `iam:DeleteRolePolicy`, and `iam:PutRolePolicy`. 
+  * If you have not created a load balancer in your AWS account, the IAM user also requires the `iam:CreateServiceLinkedRole` permission. 
+
+
+
+**Required Route 53 permissions for installation**
+
+  * `route53:ChangeResourceRecordSets`
+  * `route53:ChangeTagsForResource`
+  * `route53:CreateHostedZone`
+  * `route53:DeleteHostedZone`
+  * `route53:GetChange`
+  * `route53:GetHostedZone`
+  * `route53:ListHostedZones`
+  * `route53:ListHostedZonesByName`
+  * `route53:ListResourceRecordSets`
+  * `route53:ListTagsForResource`
+  * `route53:UpdateHostedZoneComment`
+
+
+
+**Required Amazon Simple Storage Service (S3) permissions for installation**
+
+  * `s3:CreateBucket`
+  * `s3:DeleteBucket`
+  * `s3:GetAccelerateConfiguration`
+  * `s3:GetBucketAcl`
+  * `s3:GetBucketCors`
+  * `s3:GetBucketLocation`
+  * `s3:GetBucketLogging`
+  * `s3:GetBucketObjectLockConfiguration`
+  * `s3:GetBucketPolicy`
+  * `s3:GetBucketRequestPayment`
+  * `s3:GetBucketTagging`
+  * `s3:GetBucketVersioning`
+  * `s3:GetBucketWebsite`
+  * `s3:GetEncryptionConfiguration`
+  * `s3:GetLifecycleConfiguration`
+  * `s3:GetReplicationConfiguration`
+  * `s3:ListBucket`
+  * `s3:PutBucketAcl`
+  * `s3:PutBucketPolicy`
+  * `s3:PutBucketTagging`
+  * `s3:PutEncryptionConfiguration`
+
+
+
+**S3 permissions that cluster Operators require**
+
+  * `s3:DeleteObject`
+  * `s3:GetObject`
+  * `s3:GetObjectAcl`
+  * `s3:GetObjectTagging`
+  * `s3:GetObjectVersion`
+  * `s3:PutObject`
+  * `s3:PutObjectAcl`
+  * `s3:PutObjectTagging`
+
+
+
+**Required permissions to delete base cluster resources**
+
+  * `autoscaling:DescribeAutoScalingGroups`
+  * `ec2:DeleteNetworkInterface`
+  * `ec2:DeletePlacementGroup`
+  * `ec2:DeleteVolume`
+  * `elasticloadbalancing:DeleteTargetGroup`
+  * `elasticloadbalancing:DescribeTargetGroups`
+  * `iam:DeleteAccessKey`
+  * `iam:DeleteUser`
+  * `iam:DeleteUserPolicy`
+  * `iam:ListAttachedRolePolicies`
+  * `iam:ListInstanceProfiles`
+  * `iam:ListRolePolicies`
+  * `iam:ListUserPolicies`
+  * `s3:DeleteObject`
+  * `s3:ListBucketVersions`
+  * `tag:GetResources`
+
+
+
+**Required permissions to delete network resources**
+
+  * `ec2:DeleteDhcpOptions`
+  * `ec2:DeleteInternetGateway`
+  * `ec2:DeleteNatGateway`
+  * `ec2:DeleteRoute`
+  * `ec2:DeleteRouteTable`
+  * `ec2:DeleteSubnet`
+  * `ec2:DeleteVpc`
+  * `ec2:DeleteVpcEndpoints`
+  * `ec2:DetachInternetGateway`
+  * `ec2:DisassociateRouteTable`
+  * `ec2:ReleaseAddress`
+  * `ec2:ReplaceRouteTableAssociation`
+
+
+
+Note
+
+If you use an existing VPC, your account does not require these permissions to delete network resources. Instead, your account only requires the `tag:UntagResources` permission to delete network resources. 
+
+**Optional permissions for installing a cluster with a custom Key Management Service (KMS) key**
+
+  * `kms:CreateGrant`
+  * `kms:Decrypt`
+  * `kms:DescribeKey`
+  * `kms:Encrypt`
+  * `kms:GenerateDataKey`
+  * `kms:GenerateDataKeyWithoutPlainText`
+  * `kms:ListGrants`
+  * `kms:RevokeGrant`
+
+
+
+Note
+
+If you use an Amazon Machine Image (AMI) encrypted with a customer-managed key, you must grant the `kms:ReEncrypt*` permissions in addition to these permissions. 
+
+**Required permissions to delete a cluster with shared instance roles**
+
+  * `iam:UntagRole`
+
+
+
+**Required permissions to delete a cluster with shared instance profiles**
+
+  * `tag:UntagResources`
+
+
+
+**Additional IAM and S3 permissions required to create manifests**
+
+  * `iam:GetUserPolicy`
+  * `iam:ListAccessKeys`
+  * `iam:PutUserPolicy`
+  * `iam:TagUser`
+  * `s3:AbortMultipartUpload`
+  * `s3:GetBucketPublicAccessBlock`
+  * `s3:ListBucket`
+  * `s3:ListBucketMultipartUploads`
+  * `s3:PutBucketPublicAccessBlock`
+  * `s3:PutLifecycleConfiguration`
+
+
+
+Note
+
+If you are managing your cloud provider credentials with mint mode, the IAM user also requires the `iam:CreateAccessKey` and `iam:CreateUser` permissions. 
+
+**Optional permissions for instance and quota checks for installation**
+
+  * `servicequotas:ListAWSDefaultServiceQuotas`
+
+
+
+**Optional permissions for the cluster owner account when installing a cluster on a shared VPC**
+
+  * `sts:AssumeRole`
+
+
+
+**Required permissions for enabling Bring your own public IPv4 addresses (BYOIP) feature for installation**
+
+  * `ec2:DescribePublicIpv4Pools`
+  * `ec2:DisassociateAddress`
+
+
+
+**Required permissions to install a cluster with dual-stack networking**
+
+  * `ec2:DescribeEgressOnlyInternetGateways`
+  * `ec2:CreateEgressOnlyInternetGateway`
+
+
+
+**Required permissions to delete a cluster with dual-stack networking**
+
+  * `ec2:DeleteEgressOnlyInternetGateway`

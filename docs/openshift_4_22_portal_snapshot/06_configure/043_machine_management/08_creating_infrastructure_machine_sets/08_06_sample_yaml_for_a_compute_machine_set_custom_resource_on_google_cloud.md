@@ -1,0 +1,138 @@
+# 8.6. Sample YAML for a compute machine set custom resource on Google Cloud
+
+The sample YAML defines a compute machine set for Google Cloud, enabling the automated provisioning of nodes within a specific VPC. 
+
+When you apply this configuration by using the OpenShift Container Platform CLI, you can ensure consistent scaling, scheduling, and infrastructure ID labeling for compute resources in your cluster. 
+
+The sample YAML defines a compute machine set that runs in Google Cloud and creates nodes that are labeled with `node-role.kubernetes.io/infra: ""`, where `infra` is the node label to add. 
+
+## 8.6.1. Values obtained by using the OpenShift CLI
+
+In the following example, you can obtain some of the values for your cluster by using the OpenShift Container Platform CLI. 
+
+Infrastructure ID
+    
+
+The `<infrastructure_id>` string is the infrastructure ID that is based on the cluster ID that you set when you provisioned the cluster. If you have the OpenShift CLI installed, you can obtain the infrastructure ID by running the following command: 
+
+```shell-session
+$ oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster
+```
+
+
+Image path
+    
+
+The `<path_to_image>` string is the path to the image that was used to create the disk. If you have the OpenShift CLI installed, you can obtain the path to the image by running the following command: 
+
+```shell-session
+$ oc -n openshift-machine-api \
+  -o jsonpath='{.spec.template.spec.providerSpec.value.disks[0].image}{"\n"}' \
+  get machineset/<infrastructure_id>-worker-a
+```
+
+
+**Sample Google Cloud`MachineSet` values**
+
+```yaml
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: <infrastructure_id>
+  name: <infrastructure_id>-w-a
+  namespace: openshift-machine-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: <infrastructure_id>
+      machine.openshift.io/cluster-api-machineset: <infrastructure_id>-w-a
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        machine.openshift.io/cluster-api-cluster: <infrastructure_id>
+        machine.openshift.io/cluster-api-machine-role: <infra>
+        machine.openshift.io/cluster-api-machine-type: <infra>
+        machine.openshift.io/cluster-api-machineset: <infrastructure_id>-w-a
+    spec:
+      metadata:
+        labels:
+          node-role.kubernetes.io/infra: ""
+      providerSpec:
+        value:
+          apiVersion: machine.openshift.io/v1beta1
+          canIPForward: false
+          credentialsSecret:
+            name: gcp-cloud-credentials
+          deletionProtection: false
+          disks:
+          - autoDelete: true
+            boot: true
+            image: <path_to_image>
+            labels: null
+            sizeGb: 128
+            type: pd-ssd
+          gcpMetadata:
+          - key: <custom_metadata_key>
+            value: <custom_metadata_value>
+          kind: GCPMachineProviderSpec
+          machineType: n1-standard-4
+          metadata:
+            creationTimestamp: null
+          networkInterfaces:
+          - network: <infrastructure_id>-network
+            subnetwork: <infrastructure_id>-worker-subnet
+          projectID: <project_name>
+          region: us-central1
+          serviceAccounts:
+          - email: <infrastructure_id>-w@<project_name>.iam.gserviceaccount.com
+            scopes:
+            - https://www.googleapis.com/auth/cloud-platform
+          tags:
+            - <infrastructure_id>-worker
+          userDataSecret:
+            name: worker-user-data
+          zone: us-central1-a
+      taints:
+      - key: node-role.kubernetes.io/infra
+        effect: NoSchedule
+```
+
+
+where: 
+
+`<infrastructure_id>`
+     Specifies the infrastructure ID that is based on the cluster ID that you set when you provisioned the cluster. 
+`<infra>`
+     Specifies the `<infra>` node label. 
+`<path_to_image>`
+    
+
+Specifies the path to the image that is used as a boot image in current compute machine sets. You should use the use the latest image when adding a new machine set. To use a Google Cloud Marketplace image, specify the offer to use: 
+
+  * OpenShift Container Platform: `https://www.googleapis.com/compute/v1/projects/redhat-marketplace-public/global/images/redhat-coreos-ocp-413-x86-64-202305021736`
+  * OpenShift Platform Plus: `https://www.googleapis.com/compute/v1/projects/redhat-marketplace-public/global/images/redhat-coreos-opp-413-x86-64-202305021736`
+  * OpenShift Kubernetes Engine: `https://www.googleapis.com/compute/v1/projects/redhat-marketplace-public/global/images/redhat-coreos-oke-413-x86-64-202305021736`
+
+
+
+`<gcpMetadata>`
+     Optional: Specifies the custom metadata in the form of a `key:value` pair. For example use cases, see the Google Cloud documentation for [setting custom metadata](https://cloud.google.com/compute/docs/metadata/setting-custom-metadata). 
+`<project_name>`
+     Specifies the name of the Google Cloud project that you use for your cluster. 
+`<serviceAccounts>`
+     Specifies a single service account. Multiple service accounts are not supported. 
+`<taints>`
+     Specifies a taint to prevent user workloads from being scheduled on infra nodes. 
+
+Note
+
+After adding the `NoSchedule` taint on the infrastructure node, existing DNS pods running on that node are marked as `misscheduled`. You must either delete or [add toleration on `misscheduled` DNS pods](https://access.redhat.com/solutions/6592171). 
+
+Machine sets running on Google Cloud support non-guaranteed preemptible VM instances. You can save on costs by using preemptible VM instances at a lower price compared to normal instances on Google Cloud. You can configure preemptible VM instances by adding `preemptible` to the `MachineSet` YAML file. 
+
+**Additional resources**
+
+  * [Machine sets that deploy machines as preemptible VM instances](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/machine_management/managing-compute-machines-with-the-machine-api#machineset-non-guaranteed-instance_legacy-preempt "2.4.7. Machine sets that deploy machines preemptible VM instances")

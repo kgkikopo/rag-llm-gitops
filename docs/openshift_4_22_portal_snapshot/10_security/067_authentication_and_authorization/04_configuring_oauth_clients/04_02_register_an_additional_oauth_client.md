@@ -1,0 +1,32 @@
+# 4.2. Register an additional OAuth client
+
+Register additional OAuth clients to manage authentication for applications that need to interact with your OpenShift Container Platform cluster. 
+
+**Procedure**
+
+  * To register additional OAuth clients: 
+
+```shell-session
+$ oc create -f <(echo '
+kind: OAuthClient
+apiVersion: oauth.openshift.io/v1
+metadata:
+ name: demo
+secret: "..."
+redirectURIs:
+ - "http://www.example.com/"
+grantMethod: prompt
+')
+```
+
+
+where: 
+
+`metadata.name`
+     Specifies the OAuth client name. This value is used as the `client_id` parameter when making requests to `<namespace_route>/oauth/authorize` and `<namespace_route>/oauth/token`. 
+`secret`
+     Specifies the secret value used as the `client_secret` parameter when making requests to `<namespace_route>/oauth/token`. 
+`redirectURIs`
+     Specifies the list of valid redirect URIs. The `redirect_uri` parameter specified in requests to `<namespace_route>/oauth/authorize` and `<namespace_route>/oauth/token` must be equal to or prefixed by one of these URIs. 
+`grantMethod`
+     Specifies the action to take when this client requests tokens and has not yet been granted access by the user. Use `auto` to automatically approve the grant and retry the request, or `prompt` to prompt the user to approve or deny the grant.

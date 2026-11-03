@@ -1,0 +1,183 @@
+# 15.3. Partitioning the disk
+
+To run the full pre-caching process, you have to boot from a live ISO and use the factory-precaching-cli tool from a container image to partition and pre-cache all the artifacts required. 
+
+A live ISO or RHCOS live ISO is required because the disk must not be in use when the operating system (RHCOS) is written to the device during the provisioning. Single-disk servers can also be enabled with this procedure. 
+
+**Prerequisites**
+
+  * You have a disk that is not partitioned. 
+  * You have access to the `quay.io/openshift-kni/telco-ran-tools:latest` image. 
+  * You have enough storage to install OpenShift Container Platform and pre-cache the required images. 
+  * The container must run as `privileged` due to formatting host devices. 
+  * You have to mount the `/dev` folder so that the process can be executed inside the container. 
+
+
+
+**Procedure**
+
+  1. Verify that the disk is cleared: 
+
+```shell-session
+# lsblk
+```
+
+
+The following is example output: 
+
+```shell-session
+NAME    MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+loop0     7:0    0  93.8G  0 loop /run/ephemeral
+loop1     7:1    0 897.3M  1 loop /sysroot
+sr0      11:0    1   999M  0 rom  /run/media/iso
+nvme0n1 259:1    0   1.5T  0 disk
+```
+
+
+  2. Erase any file system, RAID or partition table signatures from the device: 
+
+```shell-session
+# wipefs -a /dev/nvme0n1
+```
+
+
+The following is example output: 
+
+```shell-session
+/dev/nvme0n1: 8 bytes were erased at offset 0x00000200 (gpt): 45 46 49 20 50 41 52 54
+/dev/nvme0n1: 8 bytes were erased at offset 0x1749a955e00 (gpt): 45 46 49 20 50 41 52 54
+/dev/nvme0n1: 2 bytes were erased at offset 0x000001fe (PMBR): 55 aa
+```
+
+
+Important
+
+The tool fails if the disk is not empty because it uses partition number 1 of the device for pre-caching the artifacts. 
+
+Create a single partition and a GPT partition table. The partition is automatically labelled as `data` and created at the end of the device. Otherwise, the partition will be overridden by the `coreos-installer`. 
+
+Important
+
+The `coreos-installer` requires the partition to be created at the end of the device and to be labelled as `data`. Both requirements are necessary to save the partition when writing the RHCOS image to the disk. 
+
+  3. Run the container as `privileged` and partition the disk. In the following example, the size of the partition is 250 GiB to allow pre-caching the DU profile for Day 2 Operators: 
+
+```shell-session
+# podman run -v /dev:/dev --privileged \
+--rm quay.io/openshift-kni/telco-ran-tools:latest -- \
+factory-precaching-cli partition \
+-d /dev/nvme0n1 \
+-s 250
+```
+
+
+Where: 
+
+     * `factory-precaching-cli partition` specifies the partitioning function of the factory-precaching-cli tool. 
+     * `-d /dev/nvme0n1` defines the root directory on the disk. 
+     * `-s 250` defines the size of the disk in GB. 
+
+  4. Check the storage information: 
+
+```shell-session
+# lsblk
+```
+
+
+The following is example output: 
+
+```shell-session
+NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+loop0         7:0    0  93.8G  0 loop /run/ephemeral
+loop1         7:1    0 897.3M  1 loop /sysroot
+sr0          11:0    1   999M  0 rom  /run/media/iso
+nvme0n1     259:1    0   1.5T  0 disk
+└─nvme0n1p1 259:3    0   250G  0 part
+```
+
+
+After verifying that the disk is partitioned correctly, mount the device into `/mnt`. 
+
+Important
+
+It is recommended to mount the device into `/mnt` because that mounting point is used during GitOps ZTP preparation. 
+
+  5. Verify that the partition is formatted as `xfs`: 
+
+```shell-session
+# lsblk -f /dev/nvme0n1
+```
+
+
+The following is example output: 
+
+```shell-session
+NAME        FSTYPE LABEL UUID                                 MOUNTPOINT
+nvme0n1
+└─nvme0n1p1 xfs          1bee8ea4-d6cf-4339-b690-a76594794071
+```
+
+
+  6. Mount the partition: 
+
+```shell-session
+# mount /dev/nvme0n1p1 /mnt/
+```
+
+
+**Verification**
+
+  * Verify that the device has a GPT partition table, the partition uses the latest sectors of the device, and the partition is correctly labeled as `data`. Query the disk status to verify that the disk is partitioned as expected: 
+
+```shell-session
+# gdisk -l /dev/nvme0n1
+```
+
+
+The following is example output: 
+
+```shell-session
+GPT fdisk (gdisk) version 1.0.3
+
+Partition table scan:
+  MBR: protective
+  BSD: not present
+  APM: not present
+  GPT: present
+
+Found valid GPT with protective MBR; using GPT.
+Disk /dev/nvme0n1: 3125627568 sectors, 1.5 TiB
+Model: Dell Express Flash PM1725b 1.6TB SFF
+Sector size (logical/physical): 512/512 bytes
+Disk identifier (GUID): CB5A9D44-9B3C-4174-A5C1-C64957910B61
+Partition table holds up to 128 entries
+Main partition table begins at sector 2 and ends at sector 33
+First usable sector is 34, last usable sector is 3125627534
+Partitions will be aligned on 2048-sector boundaries
+Total free space is 2601338846 sectors (1.2 TiB)
+
+Number  Start (sector)    End (sector)  Size       Code  Name
+   1      2601338880      3125627534   250.0 GiB   8300  data
+```
+
+
+  * Check that the partition is mounted: 
+
+```shell-session
+# lsblk
+```
+
+
+The following is example output: 
+
+```shell-session
+NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+loop0         7:0    0  93.8G  0 loop /run/ephemeral
+loop1         7:1    0 897.3M  1 loop /sysroot
+sr0          11:0    1   999M  0 rom  /run/media/iso
+nvme0n1     259:1    0   1.5T  0 disk
+└─nvme0n1p1 259:2    0   250G  0 part /var/mnt
+```
+
+
+The mount point is `/var/mnt` because the `/mnt` folder in RHCOS is a link to `/var/mnt`.

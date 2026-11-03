@@ -1,0 +1,75 @@
+# 5.11. Collecting a host network trace
+
+Sometimes, troubleshooting a network-related issue is simplified by tracing network communication and capturing packets on multiple nodes at the same time. 
+
+You can use a combination of the `oc adm must-gather` command and the `registry.redhat.io/openshift4/network-tools-rhel8` container image to gather packet captures from nodes. Analyzing packet captures can help you troubleshoot network communication issues. 
+
+The `oc adm must-gather` command is used to run the `tcpdump` command in pods on specific nodes. The `tcpdump` command records the packet captures in the pods. When the `tcpdump` command exits, the `oc adm must-gather` command transfers the files with the packet captures from the pods to your client machine. 
+
+Tip
+
+The sample command in the following procedure demonstrates performing a packet capture with the `tcpdump` command. However, you can run any command in the container image that is specified in the `--image` argument to gather troubleshooting information from multiple nodes at the same time. 
+
+**Prerequisites**
+
+  * You are logged in to OpenShift Container Platform as a user with the `cluster-admin` role. 
+  * You have installed the OpenShift CLI (`oc`). 
+
+
+
+**Procedure**
+
+  1. Run a packet capture from the host network on some nodes by running the following command: 
+
+```shell-session
+$ oc adm must-gather \
+    --dest-dir /tmp/captures \
+    --source-dir '/tmp/tcpdump/' \
+    --image registry.redhat.io/openshift4/network-tools-rhel8:latest \
+    --node-selector 'node-role.kubernetes.io/worker' \
+    --host-network=true \
+    --timeout 30s \
+    -- \
+    tcpdump -i any \
+    -w /tmp/tcpdump/%Y-%m-%dT%H:%M:%S.pcap -W 1 -G 300
+```
+
+
+where: 
+
+`--dest-dir /tmp/captures`
+     The `--dest-dir` argument specifies that `oc adm must-gather` stores the packet captures in directories that are relative to `/tmp/captures` on the client machine. You can specify any writable directory. 
+`--source-dir '/tmp/tcpdump/'`
+     When `tcpdump` is run in the debug pod that `oc adm must-gather` starts, the `--source-dir` argument specifies that the packet captures are temporarily stored in the `/tmp/tcpdump` directory on the pod. 
+`--image registry.redhat.io/openshift4/network-tools-rhel8:latest`
+     The `--image` argument specifies a container image that includes the `tcpdump` command. 
+`--node-selector 'node-role.kubernetes.io/worker'`
+     The `--node-selector` argument and example value specifies to perform the packet captures on the worker nodes. As an alternative, you can specify the `--node-name` argument instead to run the packet capture on a single node. If you omit both the `--node-selector` and the `--node-name` argument, the packet captures are performed on all nodes. 
+`--host-network=true`
+     The `--host-network=true` argument is required so that the packet captures are performed on the network interfaces of the node. 
+`--timeout 30s`
+     The `--timeout` argument and value specify to run the debug pod for 30 seconds. If you do not specify the `--timeout` argument and a duration, the debug pod runs for 10 minutes. 
+`-i any`
+     The `-i any` argument for the `tcpdump` command specifies to capture packets on all network interfaces. As an alternative, you can specify a network interface name. 
+
+  2. Perform the action, such as accessing a web application, that triggers the network communication issue while the network trace captures packets. 
+  3. Review the packet capture files that `oc adm must-gather` transferred from the pods to your client machine: 
+
+```plaintext
+tmp/captures
+├── event-filter.html
+├── ip-10-0-192-217-ec2-internal
+│   └── registry-redhat-io-openshift4-network-tools-rhel8-sha256-bca...
+│       └── 2022-01-13T19:31:31.pcap
+├── ip-10-0-201-178-ec2-internal
+│   └── registry-redhat-io-openshift4-network-tools-rhel8-sha256-bca...
+│       └── 2022-01-13T19:31:30.pcap
+├── ip-...
+└── timestamp
+```
+
+
+where: 
+
+`ip-10-0-192-217-ec2-internal`, `ip-10-0-201-178-ec2-internal`
+     The packet captures are stored in directories that identify the hostname, container, and file name. If you did not specify the `--node-selector` argument, then the directory level for the hostname is not present.

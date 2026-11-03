@@ -1,0 +1,20 @@
+# Chapter 1. Two-Node with Arbiter
+
+An OpenShift Container Platform cluster with two control plane nodes and one local arbiter node is a compact, cost-effective OpenShift Container Platform topology. 
+
+The arbiter node stores the full etcd data, maintaining an etcd quorum and preventing split brain. The arbiter node does not run the additional control plane components `kube-apiserver` and `kube-controller-manager`, nor does it run workloads. 
+
+To install a cluster with two control plane nodes and one local arbiter node, assign an arbiter role to at least one of the nodes and set the control plane node count for the cluster to 2. Although OpenShift Container Platform does not currently impose a limit on the number of arbiter nodes, the typical deployment includes only one to minimize the use of hardware resources. 
+
+After installation, you can add additional worker nodes to a cluster with two control plane nodes and one local arbiter node but it cannot be converted to a standard multi-node cluster. 
+
+Note
+
+Do not add more than two worker nodes to the OpenShift Container Platform cluster. For a cluster with an arbiter, the same networking requirements as a regular cluster for connectivity between machines apply. 
+
+**Additional resources**
+
+  * [Network connectivity requirements](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_any_platform/#installation-network-connectivity-user-infra_installing-platform-agnostic)
+  * [Configuring a local arbiter node with installer-provisioned infrastructure](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_bare_metal/#ipi-install-config-local-arbiter-node_ipi-install-installation-workflow)
+  * [About a local arbiter node](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_an_on-premise_cluster_with_the_agent-based_installer/#installing-ocp-agent-local-arbiter-node_preparing-to-install-with-agent-based-installer)
+  * [Configuring a local arbiter node with user-provisioned infrastructure](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_bare_metal/#upi-install-config-local-arbiter-node_installing-bare-metal)

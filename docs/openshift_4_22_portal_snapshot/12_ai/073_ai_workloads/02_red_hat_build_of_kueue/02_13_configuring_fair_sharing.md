@@ -1,0 +1,45 @@
+# 2.13. Configuring fair sharing
+
+You can configure fair sharing as a preemption strategy to distribute borrowable resources equally or by weight between tenants of a cohort. 
+
+Borrowable resources are the unused nominal quota of all the cluster queues in a cohort. 
+
+You can configure fair sharing by setting the `preemptionPolicy` value in the `Kueue` custom resource (CR) to `FairSharing`. 
+
+## 2.13.1. Cluster queue weights
+
+After you enable fair sharing, you must configure a `weight` value for each cluster queue to define how borrowable resources are distributed among competing workloads. 
+
+Share values are important because they allow administrators to prioritize specific job types or teams. Critical applications or high-priority teams can be configured with a weighted value so that they receive a proportionally larger share of the available resources. Configuring weights ensures that unused resources are distributed according to defined organizational or project priorities rather than on a first-come, first-served basis. 
+
+The `weight` value, or share value, defines a comparative advantage for the cluster queue when competing for borrowable resources. Generally, Red Hat build of Kueue admits jobs with a lower share value first. Jobs with a higher share value are more likely to be preempted before those with lower share values. 
+
+**Example cluster queue with a fair sharing weight configured**
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: cluster-queue
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+  - coveredResources: ["cpu"]
+    flavors:
+    - name: default-flavor
+      resources:
+      - name: cpu
+        nominalQuota: 9
+  cohortName: example-cohort
+  fairSharing:
+    weight: 2
+```
+
+
+### 2.13.1.1. Zero weight
+
+A `weight` value of `0` represents an infinite share value. This means that the cluster queue is always at a disadvantage compared to others, and its workloads are always the first to be preempted when fair sharing is enabled. 
+
+## 2.13.2. Additional resources
+
+  * [Creating a `Kueue` custom resource](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/ai_workloads/red-hat-build-of-kueue#create-kueue-cr_install-kueue "2.3.4. Creating a Kueue custom resource")

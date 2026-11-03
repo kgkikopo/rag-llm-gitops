@@ -1,0 +1,206 @@
+# 7.10. Troubleshooting Windows container workload issues
+
+Use the following sections to troubleshoot Windows container workload issues. 
+
+## 7.10.1. Windows Machine Config Operator does not install
+
+If you have completed the process of installing the Windows Machine Config Operator (WMCO), but the Operator is stuck in the `InstallWaiting` phase, your issue is likely caused by a networking issue. 
+
+The WMCO requires your OpenShift Container Platform cluster to be configured with hybrid networking using OVN-Kubernetes; the WMCO cannot complete the installation process without hybrid networking available. This is necessary to manage nodes on multiple operating systems (OS) and OS variants. This must be completed during the installation of your cluster. 
+
+## 7.10.2. Investigate why a Windows machine does not become a compute node
+
+There are various reasons why a Windows Machine does not become a compute node. The best way to investigate this problem is to collect the Windows Machine Config Operator (WMCO) logs. 
+
+**Prerequisites**
+
+  * You installed the Windows Machine Config Operator (WMCO) using Operator Lifecycle Manager (OLM). 
+  * You have created a Windows compute machine set. 
+
+
+
+**Procedure**
+
+  * Run the following command to collect the WMCO logs: 
+
+```shell-session
+$ oc logs -f deployment/windows-machine-config-operator -n openshift-windows-machine-config-operator
+```
+
+
+## 7.10.3. Windows node access methods
+
+You cannot use the `oc debug node` command to access Windows nodes because it requires running a privileged pod, which Windows does not support. Instead, access a Windows node by using secure shell (SSH) or Remote Desktop Protocol (RDP) through an SSH bastion. 
+
+### 7.10.3.1. Access a Windows node by using SSH
+
+You can access a Windows node by using a secure shell (SSH). 
+
+**Prerequisites**
+
+  * You have installed the Windows Machine Config Operator (WMCO) using Operator Lifecycle Manager (OLM). 
+  * You have created a Windows compute machine set. 
+  * You have added the key used in the `cloud-private-key` secret and the key used when creating the cluster to the ssh-agent. For security reasons, remember to remove the keys from the ssh-agent after use. 
+  * You have connected to the Windows node [using an `ssh-bastion` pod](https://access.redhat.com/solutions/4073041). 
+
+
+
+**Procedure**
+
+  * Access the Windows node by running the following command: 
+
+```shell-session
+$ ssh -t -o StrictHostKeyChecking=no -o ProxyCommand='ssh -A -o StrictHostKeyChecking=no \
+    -o ServerAliveInterval=30 -W %h:%p core@$(oc get service --all-namespaces -l run=ssh-bastion \
+    -o go-template="{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}")' <username>@<windows_node_internal_ip>
+```
+
+
+where: 
+
+`<username>`
+     Specifies the cloud provider username, such as `Administrator` for Amazon Web Services (AWS) or `capi` for Microsoft Azure. 
+`<windows_node_internal_ip>`
+    
+
+Specifies the internal IP address of the node, which can be discovered by running the following command: 
+
+```shell-session
+$ oc get nodes <node_name> -o jsonpath={.status.addresses[?\(@.type==\"InternalIP\"\)].address}
+```
+
+
+### 7.10.3.2. Access a Windows node by using RDP
+
+You can access a Windows node by using a Remote Desktop Protocol (RDP). 
+
+**Prerequisites**
+
+  * You installed the Windows Machine Config Operator (WMCO) using Operator Lifecycle Manager (OLM). 
+  * You have created a Windows compute machine set. 
+  * You have added the key used in the `cloud-private-key` secret and the key used when creating the cluster to the ssh-agent. For security reasons, remember to remove the keys from the ssh-agent after use. 
+  * You have connected to the Windows node [using an `ssh-bastion` pod](https://access.redhat.com/solutions/4073041). 
+
+
+
+**Procedure**
+
+  1. Run the following command to set up an SSH tunnel: 
+
+```shell-session
+$ ssh -L 2020:<windows_node_internal_ip>:3389 \
+    core@$(oc get service --all-namespaces -l run=ssh-bastion -o go-template="{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}")
+```
+
+
+where: 
+
+`<windows_node_internal_ip>`
+    
+
+Specifies the internal IP address of the node, which can be discovered by running the following command: 
+
+```shell-session
+$ oc get nodes <node_name> -o jsonpath={.status.addresses[?\(@.type==\"InternalIP\"\)].address}
+```
+
+
+  2. From within the resulting shell, SSH into the Windows node and run the following command to create a password for the user: 
+
+```shell-session
+C:\> net user <username> *
+```
+
+
+Specify the cloud provider user name, such as `Administrator` for AWS or `capi` for Azure. You can now remotely access the Windows node at `localhost:2020` using an RDP client. 
+
+
+
+
+## 7.10.4. Collect Kubernetes node logs for Windows containers
+
+Windows container logging works differently from Linux container logging; the Kubernetes node logs for Windows workloads are streamed to the `C:\var\logs` directory by default. Therefore, you must gather the Windows node logs from that directory. 
+
+**Prerequisites**
+
+  * You installed the Windows Machine Config Operator (WMCO) using Operator Lifecycle Manager (OLM). 
+  * You have created a Windows compute machine set. 
+
+
+
+**Procedure**
+
+  1. To view the logs under all directories in `C:\var\logs`, run the following command: 
+
+```shell-session
+$ oc adm node-logs -l kubernetes.io/os=windows --path= \
+    /ip-10-0-138-252.us-east-2.compute.internal containers \
+    /ip-10-0-138-252.us-east-2.compute.internal hybrid-overlay \
+    /ip-10-0-138-252.us-east-2.compute.internal kube-proxy \
+    /ip-10-0-138-252.us-east-2.compute.internal kubelet \
+    /ip-10-0-138-252.us-east-2.compute.internal pods
+```
+
+
+  2. You can now list files in the directories using the same command and view the individual log files. For example, to view the kubelet logs, run the following command: 
+
+```shell-session
+$ oc adm node-logs -l kubernetes.io/os=windows --path=/kubelet/kubelet.log
+```
+
+
+## 7.10.5. Collect Windows application event logs
+
+The `Get-WinEvent` shim on the kubelet `logs` endpoint can be used to collect application event logs from Windows machines. 
+
+**Prerequisites**
+
+  * You installed the Windows Machine Config Operator (WMCO) using Operator Lifecycle Manager (OLM). 
+  * You have created a Windows compute machine set. 
+
+
+
+**Procedure**
+
+  * To view logs from all applications logging to the event logs on the Windows machine, run: 
+
+```shell-session
+$ oc adm node-logs -l kubernetes.io/os=windows --path=journal
+```
+
+
+The same command is executed when collecting logs with `oc adm must-gather`. 
+
+Other Windows application logs from the event log can also be collected by specifying the respective service with a `-u` flag. For example, you can run the following command to collect logs for the containerd container runtime service: 
+
+```shell-session
+$ oc adm node-logs -l kubernetes.io/os=windows --path=journal -u containerd
+```
+
+
+## 7.10.6. Collect containerd logs for Windows containers
+
+The Windows containerd container service does not stream log data to stdout, but instead, it streams log data to the Windows event log. You can view the containerd event logs to investigate issues you think might be caused by the Windows containerd container service. 
+
+**Prerequisites**
+
+  * You installed the Windows Machine Config Operator (WMCO) using Operator Lifecycle Manager (OLM). 
+  * You have created a Windows compute machine set. 
+
+
+
+**Procedure**
+
+  * View the containerd logs by running the following command: 
+
+```shell-session
+$ oc adm node-logs -l kubernetes.io/os=windows --path=containerd
+```
+
+
+## 7.10.7. Additional resources
+
+  * [Configuring hybrid networking](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/ovn-kubernetes_network_plugin/#configuring-hybrid-ovnkubernetes)
+  * [Containers on Windows troubleshooting](https://docs.microsoft.com/en-us/virtualization/windowscontainers/troubleshooting)
+  * [Troubleshoot host and container image mismatches](https://docs.microsoft.com/en-us/virtualization/windowscontainers/deploy-containers/update-containers#troubleshoot-host-and-container-image-mismatches)
+  * [Common Kubernetes problems with Windows](https://docs.microsoft.com/en-us/virtualization/windowscontainers/kubernetes/common-problems)

@@ -1,0 +1,216 @@
+# 2.7. Generate nftables firewall rules in Butane format
+
+You can generate `nftables` firewall rules in Butane format by using the `commatrix` plugin. The generated Butane configs contain `nftables` rules that allow the ingress flows defined in the communication matrix and block all other ingress flows. 
+
+Warning
+
+Errors in `nftables` rules can block legitimate traffic and isolate nodes from the cluster. Review all generated rules before applying them. 
+
+**Prerequisites**
+
+  * You installed the OpenShift CLI (`oc`). 
+  * You logged in as a user with `cluster-admin` privileges. 
+  * You installed Podman. 
+  * You installed the `commatrix` plugin. 
+  * You installed the `butane` CLI. 
+  * For custom node groups, you need an existing machine config pool that you can target using node label selectors. 
+
+
+
+**Procedure**
+
+  1. Generate firewall rules in Butane format by running the following command: 
+
+```shell-session
+$ oc commatrix generate --format butane
+```
+
+
+By default, the plugin writes the output files to the `communication-matrix` directory in your current working directory. 
+
+The plugin generates one Butane config file per node pool, named `butane-<pool_name>.yaml`, and a `node-disruption-policy.yaml` patch file, for example: 
+
+```shell-session
+communication-matrix/
+├── butane-master.yaml
+├── butane-worker.yaml
+└── node-disruption-policy.yaml
+```
+
+
+  2. Review the generated Butane config files by running the following command: 
+
+```shell-session
+$ cat communication-matrix/butane-<pool_name>.yaml
+```
+
+
+See the following example of the `butane-master.yaml` file. 
+
+Note
+
+You can adjust the generated firewall rules in your YAML file to suit your network environment. 
+
+```yaml
+variant: openshift
+version: 4.22.0
+metadata:
+  name: 98-nftables-commatrix-master
+  labels:
+    machineconfiguration.openshift.io/role: master
+systemd:
+  units:
+    - name: "nftables.service"
+      enabled: true
+      contents: |
+        # ... systemd unit configuration ...
+storage:
+  files:
+    - path: /etc/sysconfig/nftables.conf
+      mode: 0600
+      overwrite: true
+      contents:
+        inline: |
+          table inet openshift_filter {
+              chain OPENSHIFT {
+                  type filter hook input priority 1; policy accept;
+
+                  # Allow loopback traffic
+                  iif lo accept
+
+                  # Allow established and related traffic
+                  ct state established,related accept
+
+                  # Allow ICMP on ipv4
+                  ip protocol icmp accept
+                  ip6 nexthdr ipv6-icmp accept
+
+                  # Allow specific TCP and UDP ports
+                  tcp dport { 22, 6443, 9100, 10250, 30000-60999 } accept
+                  udp dport { 6081, 30000-60999 } accept
+
+                  # Drop broadcast traffic with rate-limited logging
+                  ip daddr 255.255.255.255 jump { limit rate 1/minute log prefix "firewall "; drop; }
+
+                  # Rate-limited logging and default drop
+                  jump { limit rate 1/minute log prefix "firewall "; drop; }
+              }
+          }
+```
+
+
+  3. Review the generated `NodeDisruptionPolicy` patch by running the following command: 
+
+```shell-session
+$ cat communication-matrix/node-disruption-policy.yaml
+```
+
+
+  4. Check whether your cluster already defines `NodeDisruptionPolicy` entries by running the following command: 
+
+```shell-session
+$ oc get -o yaml machineconfiguration cluster
+```
+
+
+  5. Apply the `NodeDisruptionPolicy` patch: 
+
+     1. If the `MachineConfiguration` resource does not define any `nodeDisruptionPolicy` entries, run the following command: 
+
+```shell-session
+$ oc patch machineconfiguration cluster --type=merge --patch-file=communication-matrix/node-disruption-policy.yaml
+```
+
+
+     2. If the `MachineConfiguration` resource already contains `nodeDisruptionPolicy` entries, manually add the entries from `node-disruption-policy.yaml` to the existing `.spec.nodeDisruptionPolicy.units` and `.spec.nodeDisruptionPolicy.files` lists by running the following command: 
+
+```shell-session
+$ oc edit machineconfiguration cluster
+```
+
+
+  6. Convert each Butane config to a `MachineConfig` resource by running the following command: 
+
+```shell-session
+$ butane --strict -o mc-<pool_name>.yaml communication-matrix/butane-<pool_name>.yaml
+```
+
+
+     * `<pool_name>` is the name of the target node pool. 
+
+  7. Apply the `MachineConfig` resources by running the following command for each node pool: 
+
+Important
+
+You must apply the `NodeDisruptionPolicy` patch before applying `MachineConfig` resources. If you apply `MachineConfig` resources without the `NodeDisruptionPolicy` in place, the Machine Config Operator triggers a full node reboot. 
+
+```shell-session
+$ oc apply -f mc-<pool_name>.yaml
+```
+
+
+The plugin generates `MachineConfig` resources with the naming pattern `98-nftables-commatrix-<pool_name>`. 
+
+
+
+
+**Verification**
+
+  1. Open a debug shell on a target node by running the following commands: 
+
+```shell-session
+$ oc debug node/<node_name>
+sh-5.1# chroot /host
+```
+
+
+     * `<node_name>` is the name of a cluster node. 
+     * `chroot /host` accesses the host filesystem. 
+
+  2. Verify that the `nftables` rules are active on a node by running the following command: 
+
+```shell-session
+sh-5.1# nft list ruleset
+```
+
+
+```shell-session
+...
+table inet openshift_filter {
+	chain OPENSHIFT {
+		type filter hook input priority filter + 1; policy accept;
+		iif "lo" accept
+		ct state established,related accept
+		ip protocol icmp accept
+		ip6 nexthdr ipv6-icmp accept
+		tcp dport { 22, 111, 2379-2380, 6080, 6443, 9001, 9099-9100, 9103-9105, 9107-9108, 9192, 9258, 9443, 9637, 9978-9980, 10250, 10256-10259, 17697, 22623-22624, 30000-60999 } accept
+		udp dport { 111, 6081, 30000-60999 } accept
+		ip daddr 255.255.255.255 jump {
+			limit rate 1/minute burst 5 packets log prefix "firewall "
+			drop
+		}
+		jump {
+			limit rate 1/minute burst 5 packets log prefix "firewall "
+			drop
+		}
+	}
+}
+...
+```
+
+
+  3. Verify that denied traffic is logged with rate limiting by checking the node journal: 
+
+```shell-session
+$ oc debug node/<node_name> -- chroot /host journalctl -k --grep firewall
+```
+
+
+Denied packets are logged, but log entries are rate-limited to one per minute with an initial burst of five entries. 
+
+
+
+
+**Additional resources**
+
+  * [Installing Butane](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installation_configuration/installing-customizing#installation-special-config-butane-install_installing-customizing "1.1.2. Installing Butane")

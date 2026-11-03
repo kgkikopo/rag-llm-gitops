@@ -1,0 +1,27 @@
+# 2.2. Cluster latency requirements for etcd
+
+etcd requires low network and disk I/O latency so that Raft consensus can commit changes quickly and recover from leader failures without destabilizing the cluster. 
+
+Address two constraints to provide a low-latency, high-availability network for etcd: 
+
+  * network I/O latency 
+  * disk I/O latency 
+
+
+
+etcd uses the Raft consensus algorithm, and every change must replicate to a majority of cluster members before it commits. This process is highly sensitive to network and disk performance. The minimum time for an etcd request is the round-trip time (RTT) between members, plus the time required to write data to permanent storage. 
+
+To achieve high availability, etcd must detect and recover from a leader failure quickly. This depends on two key tuning parameters: 
+
+Heartbeat Interval
+     The frequency that the leader sends a heartbeat to followers. This value should be close to the average RTT between members. 
+Election Timeout
+     The time a follower waits without hearing a heartbeat before it attempts to become the new leader. This should be at least 10 times the RTT value to account for network variance. 
+
+In a healthy cluster, the round-trip time between members should be less than 50 ms to eensure stability and avoid frequent leader elections. For this reason, etcd clusters are often deployed within a single data center or availability zone to minimize physical distance and network latency. 
+
+To support a low-latency, high-availability network, especially during the leader election process, an arbiter site should be located where it provides an RTT latency of less than 10 ms. The arbiter component of a network maintains consistency and availability in a distributed system. 
+
+**Additional resources**
+
+  * [Setting tuning parameters for etcd](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/etcd/etcd-performance#etcd-tuning-parameters_etcd-performance "3.8. Set tuning parameters for etcd")

@@ -1,0 +1,17 @@
+# 9.6. Ingress Node Firewall Operator integration
+
+Learn when to use eBPF Manager to load and manage Ingress Node Firewall programs. 
+
+The Ingress Node Firewall uses "eBPF" programs to implement some of its key firewall functionality. By default these eBPF programs are loaded into the kernel using a mechanism specific to the Ingress Node Firewall. You can configure the Ingress Node Firewall Operator to use the eBPF Manager Operator for loading and managing these programs instead. 
+
+When this integration is enabled, the following limitations apply: 
+
+  * The Ingress Node Firewall Operator uses TCX if XDP is not available and TCX is incompatible with bpfman. 
+  * The Ingress Node Firewall Operator daemon set pods remain in the `ContainerCreating` state until the firewall rules are applied. 
+  * The Ingress Node Firewall Operator daemon set pods run as privileged. 
+
+
+
+**Additional resources**
+
+  * [eBPF](https://www.kernel.org/doc/html/latest/bpf/index.html)

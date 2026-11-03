@@ -1,0 +1,11 @@
+# 4.5. Deploy multiple IP failover instances
+
+When deploying multiple IP failover instances in OpenShift Container Platform, each Keepalived daemon assigns unique VRRP IDs to virtual IP addresses. Configure the `OPENSHIFT_HA_VRRP_ID_OFFSET` variable to prevent VRRP ID range overlaps between different IP failover configurations. 
+
+Each IP failover pod created by an IP failover configuration (one pod per node or replica) runs a Keepalived daemon. When multiple IP failover configurations are present, additional pods are created, and their Keepalived daemons participate together in Virtual Router Redundancy Protocol (VRRP) negotiation. This negotiation determines which node services each virtual IP (VIP). 
+
+For each VIP, Keepalived assigns a unique internal `vrrp-id`. During VRRP negotiation, these `vrrp-id` values are used to select the node that services the corresponding VIP. 
+
+The IP failover pod assigns `vrrp-id` values sequentially to the VIPs defined in the IP failover configuration, starting from the value specified by `OPENSHIFT_HA_VRRP_ID_OFFSET`. Valid `vrrp-id` values are in the range 1..255. 
+
+When you deploy multiple IP failover configurations, ensure that the configured offset leaves sufficient space for additional VIPs and prevents `vrrp-id` ranges from overlapping across configurations.

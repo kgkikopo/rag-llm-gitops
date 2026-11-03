@@ -1,0 +1,3 @@
+# 5.1. Prerequisites
+
+Review the [sites that your cluster requires access to](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installation_configuration/#configuring-firewall-module_configuring-firewall) and determine whether any of them must bypass the proxy. By default, all cluster system egress traffic is proxied, including calls to the cloud provider API for the cloud that hosts your cluster. The system-wide proxy affects system components only, not user workloads. If necessary, add sites to the `spec.noProxy` parameter of the `Proxy` object to bypass the proxy.

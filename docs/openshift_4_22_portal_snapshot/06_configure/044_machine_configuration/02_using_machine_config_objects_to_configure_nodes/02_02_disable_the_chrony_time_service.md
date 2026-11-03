@@ -1,0 +1,71 @@
+# 2.2. Disable the chrony time service
+
+You can disable the chrony time service (`chronyd`) for nodes with a specific role by using a `MachineConfig` custom resource (CR). 
+
+**Prerequisites**
+
+  * Install the OpenShift CLI (`oc`). 
+  * Log in as a user with `cluster-admin` privileges. 
+
+
+
+**Procedure**
+
+  1. Create the `MachineConfig` CR that disables `chronyd` for the specified node role. 
+
+     1. Save the following YAML in the `disable-chronyd.yaml` file: 
+
+```yaml
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: <node_role>
+  name: disable-chronyd
+spec:
+  config:
+    ignition:
+      version: 3.5.0
+    systemd:
+      units:
+        - contents: |
+            [Unit]
+            Description=NTP client/server
+            Documentation=man:chronyd(8) man:chrony.conf(5)
+            After=ntpdate.service sntp.service ntpd.service
+            Conflicts=ntpd.service systemd-timesyncd.service
+            ConditionCapability=CAP_SYS_TIME
+            [Service]
+            Type=forking
+            PIDFile=/run/chrony/chronyd.pid
+            EnvironmentFile=-/etc/sysconfig/chronyd
+            ExecStart=/usr/sbin/chronyd $OPTIONS
+            ExecStartPost=/usr/libexec/chrony-helper update-daemon
+            PrivateTmp=yes
+            ProtectHome=yes
+            ProtectSystem=full
+            [Install]
+            WantedBy=multi-user.target
+          enabled: false
+          name: "chronyd.service"
+        - name: "kubelet-dependencies.target"
+          contents: |
+            [Unit]
+            Description=Dependencies necessary to run kubelet
+            Documentation=https://github.com/openshift/machine-config-operator/
+            Requires=basic.target network-online.target
+            Wants=NetworkManager-wait-online.service crio-wipe.service
+            Wants=rpc-statd.service
+```
+
+
+where: 
+
+`metadata.labels`
+     Specifies the node role where you want to disable `chronyd`, for example, `master`. 
+
+     2. Create the `MachineConfig` CR by running the following command: 
+
+```shell-session
+$ oc create -f disable-chronyd.yaml
+```

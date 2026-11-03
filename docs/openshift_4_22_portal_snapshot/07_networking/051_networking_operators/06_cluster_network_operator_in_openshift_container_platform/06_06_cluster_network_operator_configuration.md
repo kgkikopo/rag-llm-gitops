@@ -1,0 +1,172 @@
+# 6.6. Cluster Network Operator configuration
+
+To manage cluster networking, configure the Cluster Network Operator (CNO) `Network` custom resource (CR) named `cluster` so the cluster uses the correct IP ranges and network plugin settings for reliable pod and service connectivity. 
+
+Some settings and fields are inherited at the time of install or by the `default.Network.type` plugin, OVN-Kubernetes. 
+
+The CNO configuration inherits the following fields during cluster installation from the `Network` API in the `Network.config.openshift.io` API group: 
+
+`clusterNetwork`
+     IP address pools from which pod IP addresses are allocated. 
+`serviceNetwork`
+     IP address pool for services. 
+`defaultNetwork.type`
+     Cluster network plugin. `OVNKubernetes` is the only supported plugin during installation. 
+
+Note
+
+  * After cluster installation, you can modify the `clusterNetwork` IP address CIDR range.You can also increase the effective per-node pod subnet size. 
+  * Do not patch `Network.config.openshift.io` to change `hostPrefix`, because the Cluster Network Operator rejects that change.For more information about increasing the per-node subnet size, see "Increasing the cluster network hostPrefix". 
+  * The `serviceNetwork` range cannot be modified post-installation, either directly or by using the `ServiceCIDR` API. 
+
+
+
+You can specify the cluster network plugin configuration for your cluster by setting the fields for the `defaultNetwork` object in the CNO object named `cluster`. 
+
+## 6.6.1. Cluster Network Operator configuration object
+
+The fields for the Cluster Network Operator (CNO) are described in the following table: 
+
+Table 6.1. Cluster Network Operator configuration objectField| Type| Description  
+---|---|---  
+`metadata.name` |  `string` |  The name of the CNO object. This name is always `cluster`.   
+`spec.clusterNetwork` |  `array` |  A list specifying the blocks of IP addresses from which pod IP addresses are allocated and the subnet prefix length assigned to each individual node in the cluster. If you use dual-stack networking, specify IPv4 and IPv6 address families. For example:  `spec: clusterNetwork: - cidr: 10.128.0.0/19 hostPrefix: 23 - cidr: fd01::/48 hostPrefix: 64` If you install a cluster on AWS with dual-stack networking, the order of addresses must match the dual-stack configuration you selected. For example, if you specified the `DualStackIPv4Primary`, list the IPv4 address first.   
+`spec.serviceNetwork` |  `array` |  A block of IP addresses for services. If you use dual-stack networking, specify IPv4 and IPv6 address families. For example:  `spec: serviceNetwork: - 172.30.0.0/14 - fd02::/112` If you install a cluster on AWS with dual-stack networking, the order of addresses must match the dual-stack configuration you selected. For example, if you specified the `DualStackIPv4Primary`, list the IPv4 address first.  This value is ready-only and inherited from the `Network.config.openshift.io` object named `cluster` during cluster installation.   
+`spec.defaultNetwork` |  `object` |  Configures the network plugin for the cluster network.   
+`spec.additionalRoutingCapabilities.providers` |  `array` |  This setting enables a dynamic routing provider. The FRR routing capability provider is required for the route advertisement feature. The only supported value is `FRR`. 
+
+  * `FRR`: The FRR routing provider 
+
+`spec: additionalRoutingCapabilities: providers: - FRR`  
+Show more
+
+Important
+
+For a cluster that needs to deploy objects across multiple networks, ensure that you specify the same value for the `clusterNetwork.hostPrefix` parameter for each network type that is defined in the `install-config.yaml` file. Setting a different value for each `clusterNetwork.hostPrefix` parameter can impact the OVN-Kubernetes network plugin, where the plugin cannot effectively route object traffic among different nodes. 
+
+## 6.6.2. defaultNetwork object configuration
+
+The values for the `defaultNetwork` object are defined in the following table: 
+
+Table 6.2. defaultNetwork objectField| Type| Description  
+---|---|---  
+`type` |  `string` |  `OVNKubernetes`. The Red Hat OpenShift Networking network plugin is selected during installation. This value cannot be changed after cluster installation.  Note OpenShift Container Platform uses the OVN-Kubernetes network plugin by default.   
+`ovnKubernetesConfig` |  `object` |  This object is only valid for the OVN-Kubernetes network plugin.   
+Show more
+
+## 6.6.3. Configuration for the OVN-Kubernetes network plugin
+
+The following table describes the configuration fields for the OVN-Kubernetes network plugin: 
+
+Table 6.3. ovnKubernetesConfig objectField| Type| Description  
+---|---|---  
+`mtu` |  `integer` |  The maximum transmission unit (MTU) for the Geneve (Generic Network Virtualization Encapsulation) overlay network. This value is normally configured automatically.   
+`genevePort` |  `integer` |  The UDP port for the Geneve overlay network.   
+`ipsecConfig` |  `object` |  An object describing the IPsec mode for the cluster.   
+`ipv4` |  `object` |  Specifies a configuration object for IPv4 settings.   
+`ipv6` |  `object` |  Specifies a configuration object for IPv6 settings.   
+`policyAuditConfig` |  `object` |  Specify a configuration object for customizing network policy audit logging. If unset, the defaults audit log settings are used.   
+`routeAdvertisements` |  `string` |  Specifies whether to advertise cluster network routes. The default value is `Disabled`. 
+
+  * `Enabled`: Import routes to the cluster network and advertise cluster network routes as configured in `RouteAdvertisements` objects. 
+  * `Disabled`: Do not import routes to the cluster network or advertise cluster network routes. 
+
+  
+`gatewayConfig` |  `object` |  Optional: Specify a configuration object for customizing how egress traffic is sent to the node gateway. Valid values are `Shared` and `Local`. The default value is `Shared`. In the default setting, the Open vSwitch (OVS) outputs traffic directly to the node IP interface. If you are using hardware offloading, Red Hat recommends to use the default `Shared` gateway mode to bypass the host routing plane. In the `Local` setting, it traverses the host network; consequently, it gets applied to the routing table of the host.  Note While migrating egress traffic, you can expect some disruption to workloads and service traffic until the Cluster Network Operator (CNO) successfully rolls out the changes.   
+Show more
+
+Table 6.4. ovnKubernetesConfig.ipv4 objectField| Type| Description  
+---|---|---  
+`internalTransitSwitchSubnet` |  string  |  If your existing network infrastructure overlaps with the `100.88.0.0/16` IPv4 subnet, you can specify a different IP address range for internal use by OVN-Kubernetes. The subnet for the distributed transit switch that enables east-west traffic. This subnet cannot overlap with any other subnets used by OVN-Kubernetes or on the host itself. It must be large enough to accommodate one IP address per node in your cluster.  The default value is `100.88.0.0/16`.   
+`internalJoinSubnet` |  string  |  If your existing network infrastructure overlaps with the `100.64.0.0/16` IPv4 subnet, you can specify a different IP address range for internal use by OVN-Kubernetes. You must ensure that the IP address range does not overlap with any other subnet used by your OpenShift Container Platform installation. The IP address range must be larger than the maximum number of nodes that can be added to the cluster. For example, if the `clusterNetwork.cidr` value is `10.128.0.0/14` and the `clusterNetwork.hostPrefix` value is `/23`, then the maximum number of nodes is `2^(23-14)=512`.  The default value is `100.64.0.0/16`.   
+Show more
+
+Table 6.5. ovnKubernetesConfig.ipv6 objectField| Type| Description  
+---|---|---  
+`internalTransitSwitchSubnet` |  string  |  If your existing network infrastructure overlaps with the `fd97::/64` IPv6 subnet, you can specify a different IP address range for internal use by OVN-Kubernetes. The subnet for the distributed transit switch that enables east-west traffic. This subnet cannot overlap with any other subnets used by OVN-Kubernetes or on the host itself. It must be large enough to accommodate one IP address per node in your cluster.  The default value is `fd97::/64`.   
+`internalJoinSubnet` |  string  |  If your existing network infrastructure overlaps with the `fd98::/64` IPv6 subnet, you can specify a different IP address range for internal use by OVN-Kubernetes. You must ensure that the IP address range does not overlap with any other subnet used by your OpenShift Container Platform installation. The IP address range must be larger than the maximum number of nodes that can be added to the cluster.  The default value is `fd98::/64`.   
+Show more
+
+Table 6.6. policyAuditConfig objectField| Type| Description  
+---|---|---  
+`rateLimit` |  integer  |  The maximum number of messages to generate every second per node. The default value is `20` messages per second.   
+`maxFileSize` |  integer  |  The maximum size for the audit log in bytes. The default value is `50000000` or 50 MB.   
+`maxLogFiles` |  integer  |  The maximum number of log files that are retained.   
+`destination` |  string  |  One of the following additional audit log targets: 
+
+`libc`
+     The libc `syslog()` function of the journald process on the host. 
+`udp:<host>:<port>`
+     A syslog server. Replace `<host>:<port>` with the host and port of the syslog server. 
+`unix:<file>`
+     A UNIX Domain Socket file specified by `<file>`. 
+`null`
+     Do not send the audit logs to any additional target.   
+`syslogFacility` |  string  |  The syslog facility, such as `kern`, as defined by RFC5424. The default value is `local0`.   
+Show more
+
+Table 6.7. gatewayConfig objectField| Type| Description  
+---|---|---  
+`routingViaHost` |  `boolean` |  Set this field to `true` to send egress traffic from pods to the host networking stack. For highly-specialized installations and applications that rely on manually configured routes in the kernel routing table, you might want to route egress traffic to the host networking stack. By default, egress traffic is processed in OVN to exit the cluster and is not affected by specialized routes in the kernel routing table. The default value is `false`.  This field has an interaction with the Open vSwitch hardware offloading feature. If you set this field to `true`, you do not receive the performance benefits of the offloading because egress traffic is processed by the host networking stack.   
+`ipForwarding` |  `object` |  You can control IP forwarding for all traffic on OVN-Kubernetes managed interfaces by using the `ipForwarding` specification in the `Network` resource. Specify `Restricted` to only allow IP forwarding for Kubernetes related traffic. Specify `Global` to allow forwarding of all IP traffic. For new installations, the default is `Restricted`. For updates to OpenShift Container Platform 4.14 or later, the default is `Global`.  Note The default value of `Restricted` sets the IP forwarding to drop.   
+`ipv4` |  `object` |  Optional: Specify an object to configure the internal OVN-Kubernetes masquerade address for host to service traffic for IPv4 addresses.   
+`ipv6` |  `object` |  Optional: Specify an object to configure the internal OVN-Kubernetes masquerade address for host to service traffic for IPv6 addresses.   
+Show more
+
+Table 6.8. gatewayConfig.ipv4 objectField| Type| Description  
+---|---|---  
+`internalMasqueradeSubnet` |  `string` |  The masquerade IPv4 addresses that are used internally to enable host to service traffic. The host is configured with these IP addresses and the shared gateway bridge interface. The default value is `169.254.169.0/29`.  Important For OpenShift Container Platform 4.17 and later versions, clusters use `169.254.0.0/17` as the default masquerade subnet. For upgraded clusters, there is no change to the default masquerade subnet.   
+Show more
+
+Table 6.9. gatewayConfig.ipv6 objectField| Type| Description  
+---|---|---  
+`internalMasqueradeSubnet` |  `string` |  The masquerade IPv6 addresses that are used internally to enable host to service traffic. The host is configured with these IP addresses and the shared gateway bridge interface. The default value is `fd69::/125`.  Important For OpenShift Container Platform 4.17 and later versions, clusters use `fd69::/112` as the default masquerade subnet. For upgraded clusters, there is no change to the default masquerade subnet.   
+Show more
+
+Table 6.10. ipsecConfig objectField| Type| Description  
+---|---|---  
+`mode` |  `string` |  Specifies the behavior of the IPsec implementation. Must be one of the following values: 
+
+  * `Disabled`: IPsec is not enabled on cluster nodes. 
+  * `External`: IPsec is enabled for network traffic with external hosts. 
+  * `Full`: IPsec is enabled for pod traffic and network traffic with external hosts. 
+
+  
+Show more
+
+Note
+
+You can only change the configuration for your cluster network plugin during cluster installation, except for the `gatewayConfig` field that can be changed at runtime as a postinstallation activity. 
+
+**Example OVN-Kubernetes configuration with IPsec enabled**
+
+```yaml
+defaultNetwork:
+  type: OVNKubernetes
+  ovnKubernetesConfig:
+    mtu: 1400
+    genevePort: 6081
+    ipsecConfig:
+      mode: Full
+```
+
+
+## 6.6.4. Cluster Network Operator example configuration
+
+A complete CNO configuration is specified in the following example: 
+
+**Example Cluster Network Operator object**
+
+```yaml
+apiVersion: operator.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  serviceNetwork:
+  - 172.30.0.0/16
+  networkType: OVNKubernetes
+```

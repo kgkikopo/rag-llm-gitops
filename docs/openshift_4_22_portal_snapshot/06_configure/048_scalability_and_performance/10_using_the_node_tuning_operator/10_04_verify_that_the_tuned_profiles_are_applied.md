@@ -1,0 +1,51 @@
+# 10.4. Verify that the TuneD profiles are applied
+
+Verify the TuneD profiles that are applied to your cluster node. 
+
+**Procedure**
+
+  1. Run the following command to verify the TuneD profiles that are applied to your cluster node: 
+
+```shell-session
+$ oc get profile.tuned.openshift.io -n openshift-cluster-node-tuning-operator
+```
+
+
+**Example output**
+
+```shell-session
+NAME             TUNED                     APPLIED   DEGRADED   AGE
+master-0         openshift-control-plane   True      False      6h33m
+master-1         openshift-control-plane   True      False      6h33m
+master-2         openshift-control-plane   True      False      6h33m
+worker-a         openshift-node            True      False      6h28m
+worker-b         openshift-node            True      False      6h28m
+```
+
+
+where: 
+
+     * `NAME`: Name of the Profile object. There is one Profile object per node and their names match. 
+     * `TUNED`: Name of the desired TuneD profile to apply. 
+     * `APPLIED`: `True` if the TuneD daemon applied the desired profile. (`True/False/Unknown`). 
+     * `DEGRADED`: `True` if any errors were reported during application of the TuneD profile (`True/False/Unknown`). 
+     * `AGE`: Time elapsed since the creation of Profile object. 
+
+  2. Run the following command to get status information about the `ClusterOperator/node-tuning` object: 
+
+```shell-session
+$ oc get co/node-tuning -n openshift-cluster-node-tuning-operator
+```
+
+
+**Example output**
+
+```shell-session
+NAME          VERSION   AVAILABLE   PROGRESSING   DEGRADED   SINCE   MESSAGE
+node-tuning   4.22.1    True        False         True       60m     1/5 Profiles with bootcmdline conflict
+```
+
+
+The `ClusterOperator/node-tuning` object also contains useful information about the Operator and its node agents' health. For example, Operator misconfiguration is reported by `ClusterOperator/node-tuning` status messages. 
+
+If either the `ClusterOperator/node-tuning` or a profile object’s status is `DEGRADED`, additional information is provided in the Operator or operand logs.

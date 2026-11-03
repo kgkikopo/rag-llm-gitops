@@ -1,0 +1,102 @@
+# 11.6. Scale down the data plane to zero
+
+If you are not using the hosted control plane, to save the resources and cost you can scale down a data plane to zero. 
+
+Note
+
+Ensure you are prepared to scale down the data plane to zero. Because the workload from the worker nodes disappears after scaling down. 
+
+**Procedure**
+
+  1. Set the `kubeconfig` file to access the hosted cluster by running the following command: 
+
+```shell-session
+$ export KUBECONFIG=<install_directory>/auth/kubeconfig
+```
+
+
+  2. Get the name of the `NodePool` resource associated to your hosted cluster by running the following command: 
+
+```shell-session
+$ oc get nodepool --namespace <hosted_cluster_namespace>
+```
+
+
+  3. Optional: To prevent the pods from draining, add the `nodeDrainTimeout` field in the `NodePool` resource by running the following command: 
+
+```shell-session
+$ oc edit nodepool <nodepool_name>  --namespace <hosted_cluster_namespace>
+```
+
+
+**Example output**
+
+```yaml
+apiVersion: hypershift.openshift.io/v1alpha1
+kind: NodePool
+metadata:
+# ...
+  name: nodepool-1
+  namespace: clusters
+# ...
+spec:
+  arch: amd64
+  clusterName: clustername
+  management:
+    autoRepair: false
+    replace:
+      rollingUpdate:
+        maxSurge: 1
+        maxUnavailable: 0
+      strategy: RollingUpdate
+    upgradeType: Replace
+  nodeDrainTimeout: 0s
+  nodeVolumeDetachTimeout: 0
+# ...
+```
+
+
+`spec.arch.clusterName`
+     Defines the name of your hosted cluster. 
+`spec.nodeDrainTimeout`
+     Specifies the total amount of time that the controller spends to drain a node. By default, the `nodeDrainTimeout: 0s` setting blocks the node draining process. To allow the node draining process to continue for a certain period of time, you can set the value of the `nodeDrainTimeout` field; for example, `nodeDrainTimeout: 1m`. 
+`spec.nodeVolumeDetachTimeout`
+    
+
+Specifies the total amount of time that the controller spends detaching volumes from a node. By default, the `0` setting blocks the volume detachment process. 
+
+Note
+
+To prevent nodes from getting stuck when scaling down, set the `.spec.nodeDrainTimeout` and `.spec.nodeVolumeDetachTimeout` in the `NodePool` resource to a value greater than `0`. This setting forces nodes to be removed after the timeout specified in the field is reached, regardless of whether the node can be drained or the volumes can be detached. 
+
+  4. Scale down the `NodePool` resource associated to your hosted cluster by running the following command: 
+
+```shell-session
+$ oc scale nodepool/<nodepool_name> --namespace <hosted_cluster_namespace> \
+  --replicas=0
+```
+
+
+Note
+
+After scaling down the data plan to zero, some pods in the control plane stay in the `Pending` status and the hosted control plane stays up and running. If necessary, you can scale up the `NodePool` resource. 
+
+  5. Optional: Scale up the `NodePool` resource associated to your hosted cluster by running the following command: 
+
+```shell-session
+$ oc scale nodepool/<nodepool_name> --namespace <hosted_cluster_namespace> --replicas=1
+```
+
+
+After rescaling the `NodePool` resource, wait for couple of minutes for the `NodePool` resource to become available in a `Ready` state. 
+
+
+
+
+**Verification**
+
+  * Verify that the value for the `nodeDrainTimeout` field is greater than `0s` by running the following command: 
+
+```shell-session
+$ oc get nodepool -n <hosted_cluster_namespace> <nodepool_name> -ojsonpath='{.spec.nodeDrainTimeout}'
+```

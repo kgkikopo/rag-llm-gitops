@@ -1,0 +1,12 @@
+# 5.28. Backup Recovery reference CRs
+
+The following table lists the backup and recovery reference configuration custom resources (CRs) for the hub cluster. 
+
+Table 5.14. Backup Recovery CRsComponent| Reference CR| Description| Optional  
+---|---|---|---  
+OADP  |  `backupSchedule.yaml` |  Defines a `BackupSchedule` CR.  |  Yes   
+OADP  |  `dataProtectionApplication.yaml` |  Defines the data protection application with backup storage and configuration parameters.  |  Yes   
+OADP  |  `objectBucketClaim.yaml` |  Defines the object bucket used by backup.  |  Yes   
+OADP  |  `policy-backup.yaml` |  Defines a policy to ensure `BareMetalHost` CRs are correctly annotated for backup.  |  Yes   
+OADP  |  `restore.yaml` |  Example `Restore` CR.  |  Yes   
+Show more

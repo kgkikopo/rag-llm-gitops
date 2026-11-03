@@ -1,0 +1,156 @@
+# 16.2. Configure bound service account tokens using volume projection
+
+You can configure pods to request bound service account tokens by using volume projection. 
+
+**Prerequisites**
+
+  * You have access to the cluster as a user with the `cluster-admin` role. 
+  * You have created a service account. This procedure assumes that the service account is named `build-robot`. 
+
+
+
+**Procedure**
+
+  1. Optional: Set the service account issuer. 
+
+This step is typically not required if the bound tokens are used only within the cluster. 
+
+Important
+
+If you change the service account issuer to a custom one, the previous service account issuer is still trusted for the next 24 hours. 
+
+You can force all holders to request a new bound token either by manually restarting all pods in the cluster or by performing a rolling node restart. Before performing either action, wait for a new revision of the Kubernetes API server pods to roll out with your service account issuer changes. 
+
+     1. Edit the `cluster` `Authentication` object: 
+
+```shell-session
+$ oc edit authentications cluster
+```
+
+
+     2. Set the `spec.serviceAccountIssuer` field to the desired service account issuer value: 
+
+```yaml
+spec:
+  serviceAccountIssuer: https://test.default.svc
+```
+
+
+This value should be a URL from which the recipient of a bound token can source the public keys necessary to verify the signature of the token. The default is `https://kubernetes.default.svc`. 
+
+     3. Save the file to apply the changes. 
+     4. Wait for a new revision of the Kubernetes API server pods to roll out. It can take several minutes for all nodes to update to the new revision. Run the following command: 
+
+```shell-session
+$ oc get kubeapiserver -o=jsonpath='{range .items[0].status.conditions[?(@.type=="NodeInstallerProgressing")]}{.reason}{"\n"}{.message}{"\n"}'
+```
+
+
+Review the `NodeInstallerProgressing` status condition for the Kubernetes API server to verify that all nodes are at the latest revision. The output shows `AllNodesAtLatestRevision` upon successful update: 
+
+```shell-session
+AllNodesAtLatestRevision
+3 nodes are at revision 12
+```
+
+
+In this example, the latest revision number is `12`. 
+
+If the output shows a message similar to one of the following messages, the update is still in progress. Wait a few minutes and try again. 
+
+        * `3 nodes are at revision 11; 0 nodes have achieved new revision 12`
+        * `2 nodes are at revision 11; 1 nodes are at revision 12`
+
+     5. Optional: Force the holder to request a new bound token either by performing a rolling node restart or by manually restarting all pods in the cluster. 
+
+        * Perform a rolling node restart: 
+
+Warning
+
+It is not recommended to perform a rolling node restart if you have custom workloads running on your cluster, because it can cause a service interruption. Instead, manually restart all pods in the cluster. 
+
+Restart nodes sequentially. Wait for the node to become fully available before restarting the next node. See _Rebooting a node gracefully_ for instructions on how to drain, restart, and mark a node as schedulable again. 
+
+        * Manually restart all pods in the cluster: 
+
+Warning
+
+Be aware that running this command causes a service interruption, because it deletes every running pod in every namespace. These pods will automatically restart after they are deleted. 
+
+Run the following command: 
+
+```shell-session
+$ for I in $(oc get ns -o jsonpath='{range .items[*]} {.metadata.name}{"\n"} {end}'); \
+      do oc delete pods --all -n $I; \
+      sleep 1; \
+      done
+```
+
+
+  2. Configure a pod to use a bound service account token by using volume projection. 
+
+     1. Create a file called `pod-projected-svc-token.yaml` with the following contents: 
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - image: nginx
+    name: nginx
+    volumeMounts:
+    - mountPath: /var/run/secrets/tokens
+      name: vault-token
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: [ALL]
+  serviceAccountName: build-robot
+  volumes:
+  - name: vault-token
+    projected:
+      sources:
+      - serviceAccountToken:
+          path: vault-token
+          expirationSeconds: 7200
+          audience: vault
+```
+
+
+where: 
+
+`spec.securityContext.runAsNonRoot`
+     Specifies whether to restrict containers from running as root. When `true`, containers cannot run as root to minimize compromise risks. 
+`spec.securityContext.seccompProfile.type`
+     Specifies the seccomp profile to use. Set to `RuntimeDefault` to use the default seccomp profile, limiting to essential system calls, to reduce risks. 
+`spec.serviceAccountName`
+     Specifies an existing service account. 
+`spec.volumes.projected.sources.serviceAccountToken.path`
+     Specifies a path relative to the mount point of the file to project the token into. 
+`spec.volumes.projected.sources.serviceAccountToken.expirationSeconds`
+     Specifies the expiration of the service account token, in seconds. The default value is 3600 seconds (1 hour). This value must be at least 600 seconds (10 minutes). The kubelet starts trying to rotate the token if the token is older than 80 percent of its time to live or if the token is older than 24 hours. This parameter is optional. 
+`spec.volumes.projected.sources.serviceAccountToken.audience`
+     Specifies the intended audience of the token. The recipient of a token should verify that the recipient identity matches the audience claim of the token, and should otherwise reject the token. The audience defaults to the identifier of the API server. This parameter is optional. 
+
+Note
+
+In order to prevent unexpected failure, OpenShift Container Platform overrides the `expirationSeconds` value to be one year from the initial token generation with the `--service-account-extend-token-expiration` default of `true`. You cannot change this setting. 
+
+     2. Create the pod: 
+
+```shell-session
+$ oc create -f pod-projected-svc-token.yaml
+```
+
+
+The kubelet requests and stores the token on behalf of the pod, makes the token available to the pod at a configurable file path, and refreshes the token as it approaches expiration. 
+
+  3. The application that uses the bound token must handle reloading the token when it rotates. 
+
+The kubelet rotates the token if it is older than 80 percent of its time to live, or if the token is older than 24 hours.

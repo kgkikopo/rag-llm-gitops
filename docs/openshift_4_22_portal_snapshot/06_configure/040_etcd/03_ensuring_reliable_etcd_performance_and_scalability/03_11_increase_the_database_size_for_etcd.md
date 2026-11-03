@@ -1,0 +1,115 @@
+# 3.11. Increase the database size for etcd
+
+Increase the etcd disk quota when low space or excessive growth alerts appear. Expanding the quota before etcd runs out of space prevents write failures and cluster instability. 
+
+You can set the disk quota in gibibytes (GiB) for each etcd instance. If you set a disk quota for your etcd instance, you can specify integer values from 8 to 32. The default value is 8. You can specify only increasing values. 
+
+You might want to increase the disk quota if you encounter a `low space` alert. This alert indicates that the cluster is too large to fit in etcd despite automatic compaction and defragmentation. If you see this alert, you need to increase the disk quota immediately because after etcd runs out of space, writes fail. 
+
+Another scenario where you might want to increase the disk quota is if you encounter an `excessive database growth` alert. This alert is a warning that the database might grow too large in the next four hours. In this scenario, consider increasing the disk quota so that you do not eventually encounter a `low space` alert and possible write fails. 
+
+If you increase the disk quota, the disk space that you specify is not immediately reserved. Instead, etcd can grow to that size if needed. Ensure that etcd is running on a dedicated disk that is larger than the value that you specify for the disk quota. 
+
+For large etcd databases, the control plane nodes must have additional memory and storage. Because you must account for the API server cache, the minimum memory required is at least three times the configured size of the etcd database. 
+
+Important
+
+Increasing the database size for etcd is a Technology Preview feature only. Technology Preview features are not supported with Red Hat production service level agreements (SLAs) and might not be functionally complete. Red Hat does not recommend using them in production. These features provide early access to upcoming product features, enabling customers to test functionality and provide feedback during the development process. 
+
+For more information about the support scope of Red Hat Technology Preview features, see [Technology Preview Features Support Scope](https://access.redhat.com/support/offerings/techpreview/). 
+
+**Procedure**
+
+  1. Check the current value of the disk quota for each etcd instance by entering the following command: 
+
+```shell-session
+$ oc describe etcd/cluster | grep "Backend Quota"
+```
+
+
+**Example output**
+
+```shell-session
+Backend Quota Gi B: <value>
+```
+
+
+  2. Change the value of the disk quota by entering the following command: 
+
+```shell-session
+$ oc patch etcd/cluster --type=merge -p '{"spec": {"backendQuotaGiB": <value>}}'
+```
+
+
+**Example output**
+
+```shell-session
+etcd.operator.openshift.io/cluster patched
+```
+
+
+**Verification**
+
+  1. Verify that the new value for the disk quota is set by entering the following command: 
+
+```shell-session
+$ oc describe etcd/cluster | grep "Backend Quota"
+```
+
+
+The etcd Operator automatically rolls out the etcd instances with the new values. 
+
+  2. Verify that the etcd pods are up and running by entering the following command: 
+
+```shell-session
+$ oc get pods -n openshift-etcd
+```
+
+
+The following output shows the expected entries. 
+
+**Example output**
+
+```shell-session
+NAME                                                   READY   STATUS      RESTARTS   AGE
+etcd-ci-ln-b6kfsw2-72292-mzwbq-master-0                4/4     Running     0          39m
+etcd-ci-ln-b6kfsw2-72292-mzwbq-master-1                4/4     Running     0          37m
+etcd-ci-ln-b6kfsw2-72292-mzwbq-master-2                4/4     Running     0          41m
+etcd-guard-ci-ln-b6kfsw2-72292-mzwbq-master-0          1/1     Running     0          51m
+etcd-guard-ci-ln-b6kfsw2-72292-mzwbq-master-1          1/1     Running     0          49m
+etcd-guard-ci-ln-b6kfsw2-72292-mzwbq-master-2          1/1     Running     0          54m
+installer-5-ci-ln-b6kfsw2-72292-mzwbq-master-1         0/1     Completed   0          51m
+installer-7-ci-ln-b6kfsw2-72292-mzwbq-master-0         0/1     Completed   0          46m
+installer-7-ci-ln-b6kfsw2-72292-mzwbq-master-1         0/1     Completed   0          44m
+installer-7-ci-ln-b6kfsw2-72292-mzwbq-master-2         0/1     Completed   0          49m
+installer-8-ci-ln-b6kfsw2-72292-mzwbq-master-0         0/1     Completed   0          40m
+installer-8-ci-ln-b6kfsw2-72292-mzwbq-master-1         0/1     Completed   0          38m
+installer-8-ci-ln-b6kfsw2-72292-mzwbq-master-2         0/1     Completed   0          42m
+revision-pruner-7-ci-ln-b6kfsw2-72292-mzwbq-master-0   0/1     Completed   0          43m
+revision-pruner-7-ci-ln-b6kfsw2-72292-mzwbq-master-1   0/1     Completed   0          43m
+revision-pruner-7-ci-ln-b6kfsw2-72292-mzwbq-master-2   0/1     Completed   0          43m
+revision-pruner-8-ci-ln-b6kfsw2-72292-mzwbq-master-0   0/1     Completed   0          42m
+revision-pruner-8-ci-ln-b6kfsw2-72292-mzwbq-master-1   0/1     Completed   0          42m
+revision-pruner-8-ci-ln-b6kfsw2-72292-mzwbq-master-2   0/1     Completed   0          42m
+```
+
+
+  3. Verify that the disk quota value is updated for the etcd pod by entering the following command: 
+
+```shell-session
+$ oc describe -n openshift-etcd pod/<etcd_podname> | grep "ETCD_QUOTA_BACKEND_BYTES"
+```
+
+
+The value might not have changed from the default value of `8`. 
+
+**Example output**
+
+```shell-session
+ETCD_QUOTA_BACKEND_BYTES:                               8589934592
+```
+
+
+Note
+
+While the value that you set is an integer in GiB, the value shown in the output is converted to bytes.

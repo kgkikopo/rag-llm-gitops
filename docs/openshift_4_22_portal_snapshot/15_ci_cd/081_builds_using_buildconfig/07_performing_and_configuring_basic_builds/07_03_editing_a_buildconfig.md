@@ -1,0 +1,44 @@
+# 7.3. Editing a BuildConfig
+
+To edit your build configurations, you use the **Edit BuildConfig** option in the **Builds** page. 
+
+You can use either of the following views to edit a `BuildConfig`: 
+
+  * The **Form view** enables you to edit your `BuildConfig` using the standard form fields and checkboxes. 
+  * The **YAML view** enables you to edit your `BuildConfig` with full control over the operations. 
+
+
+
+You can switch between the **Form view** and **YAML view** without losing any data. The data in the **Form view** is transferred to the **YAML view** and vice versa. 
+
+**Procedure**
+
+  1. On the **Builds** page, click the Options menu ![kebab](https://access.redhat.com/webassets/avalon/d/OpenShift_Container_Platform-4.22-Builds_using_BuildConfig-en-US/images/f468284ec3cc9bf27e6bd2c83849ca50/kebab.png) to see the **Edit BuildConfig** option. 
+  2. Click **Edit BuildConfig** to see the **Form view** option. 
+  3. In the **Git** section, enter the Git repository URL for the codebase you want to use to create an application. The URL is then validated. 
+
+     * Optional: Click **Show Advanced Git Options** to add details such as: 
+
+       * **Git Reference** to specify a branch, tag, or commit that contains code you want to use to build the application. 
+       * **Context Dir** to specify the subdirectory that contains code you want to use to build the application. 
+       * **Source Secret** to create a **Secret Name** with credentials for pulling your source code from a private repository. 
+
+  4. In the **Build from** section, select the option that you would like to build from. You can use the following options: 
+
+     * **Image Stream tag** references an image for a given image stream and tag. Enter the project, image stream, and tag of the location you would like to build from and push to. 
+     * **Image Stream image** references an image for a given image stream and image name. Enter the image stream image you would like to build from. Also enter the project, image stream, and tag to push to. 
+     * **Docker image** : The Docker image is referenced through a Docker image repository. You will also need to enter the project, image stream, and tag to refer to where you would like to push to. 
+
+  5. Optional: In the **Environment Variables** section, add the environment variables associated with the project by using the **Name** and **Value** fields. To add more environment variables, use **Add Value** , or **Add from ConfigMap** and **Secret** . 
+  6. Optional: To further customize your application, use the following advanced options: 
+
+Trigger
+     Triggers a new image build when the builder image changes. Add more triggers by clicking **Add Trigger** and selecting the **Type** and **Secret**. 
+Secrets
+     Adds secrets for your application. Add more secrets by clicking **Add secret** and selecting the **Secret** and **Mount point**. 
+Policy
+     Click **Run policy** to select the build run policy. The selected policy determines the order in which builds created from the build configuration must run. 
+Hooks
+     Select **Run build hooks after image is built** to run commands at the end of the build and verify the image. Add **Hook type** , **Command** , and **Arguments** to append to the command. 
+
+  7. Click **Save** to save the `BuildConfig`.

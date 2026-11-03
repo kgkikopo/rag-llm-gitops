@@ -1,0 +1,15 @@
+# Chapter 1. Authorization APIs
+
+- [1.1. LocalResourceAccessReview [authorization.openshift.io/v1]](01_01_localresourceaccessreview_authorization_openshift_io_v1.md)
+- [1.2. LocalSubjectAccessReview [authorization.openshift.io/v1]](01_02_localsubjectaccessreview_authorization_openshift_io_v1.md)
+- [1.3. ResourceAccessReview [authorization.openshift.io/v1]](01_03_resourceaccessreview_authorization_openshift_io_v1.md)
+- [1.4. SelfSubjectRulesReview [authorization.openshift.io/v1]](01_04_selfsubjectrulesreview_authorization_openshift_io_v1.md)
+- [1.5. SubjectAccessReview [authorization.openshift.io/v1]](01_05_subjectaccessreview_authorization_openshift_io_v1.md)
+- [1.6. SubjectRulesReview [authorization.openshift.io/v1]](01_06_subjectrulesreview_authorization_openshift_io_v1.md)
+- [1.7. SelfSubjectReview [authentication.k8s.io/v1]](01_07_selfsubjectreview_authentication_k8s_io_v1.md)
+- [1.8. TokenRequest [authentication.k8s.io/v1]](01_08_tokenrequest_authentication_k8s_io_v1.md)
+- [1.9. TokenReview [authentication.k8s.io/v1]](01_09_tokenreview_authentication_k8s_io_v1.md)
+- [1.10. LocalSubjectAccessReview [authorization.k8s.io/v1]](01_10_localsubjectaccessreview_authorization_k8s_io_v1.md)
+- [1.11. SelfSubjectAccessReview [authorization.k8s.io/v1]](01_11_selfsubjectaccessreview_authorization_k8s_io_v1.md)
+- [1.12. SelfSubjectRulesReview [authorization.k8s.io/v1]](01_12_selfsubjectrulesreview_authorization_k8s_io_v1.md)
+- [1.13. SubjectAccessReview [authorization.k8s.io/v1]](01_13_subjectaccessreview_authorization_k8s_io_v1.md)

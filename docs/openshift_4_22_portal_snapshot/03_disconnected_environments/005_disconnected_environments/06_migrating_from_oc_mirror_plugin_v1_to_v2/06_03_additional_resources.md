@@ -1,0 +1,6 @@
+# 6.3. Additional resources
+
+* [Mirroring an image set in a partially disconnected environment](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/disconnected_environments/about-installing-oc-mirror-v2#oc-mirror-workflows-partially-disconnected-v2_about-installing-oc-mirror-v2 "5.4.3. Mirror an image set in a partially disconnected environment")
+  * [Mirroring an image set in a fully disconnected environment](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/disconnected_environments/about-installing-oc-mirror-v2#oc-mirror-workflows-fully-disconnected-v2_about-installing-oc-mirror-v2 "5.4.4. Mirror an image set in a fully disconnected environment")
+  * [Changes from oc-mirror plugin v1 to v2](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/disconnected_environments/oc-mirror-migration-v1-to-v2#oc-mirror-migration-differences_oc-mirror-migration-v1-to-v2 "6.1. Changes from oc-mirror plugin v1 to v2")
+  * [Deletion of images from your disconnected environment](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/disconnected_environments/about-installing-oc-mirror-v2#oc-mirror-procedure-delete-v2_about-installing-oc-mirror-v2 "5.6.2. Deleting images from a disconnected environment")

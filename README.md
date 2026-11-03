@@ -8,7 +8,7 @@ The application includes an interface to compare responses generated directly by
 
 ### Components
 
-- **Documentation Ingestion**: Ingests documentation from the `enterprise-4.22` branch of [`openshift/openshift-docs`](https://github.com/openshift/openshift-docs).
+- **Documentation Ingestion**: Ingests the checked-in OpenShift 4.22 Markdown portal snapshot with exact section citations.
 - **Model Stack**:
   - **LLM**: `google/gemma-4-E4B-it` served via vLLM with FP8 quantization (`--quantization=fp8`, 32k context length).
   - **Embeddings**: `Qwen/Qwen3-Embedding-0.6B`.
@@ -66,7 +66,7 @@ Gemma-3-4B uses a hybrid sliding window attention mechanism (local layers at 1,0
 1. **`charts/all/vllm-inference-service`**: Deploys `google/gemma-4-E4B-it` using vLLM on a GPU-enabled node.
 2. **`charts/all/rag-llm`**:
    - **`pgvector`**: PostgreSQL deployment with the `pgvector` extension.
-   - **`populate-vectordb` Job**: Clones `openshift/openshift-docs` (`enterprise-4.22`), chunks markdown/adoc sources (chunk size: 2048, overlap: 200), computes embeddings, and stores them in PostgreSQL.
+   - **`populate-vectordb` Job**: Reads the checked-in Markdown corpus from the deployed Git revision, chunks it by heading with a 2,048-character budget and up to 200 characters of overlap, and stores embeddings and citation metadata in PostgreSQL.
    - **`llm-ui`**: Gradio-based web interface with chat and comparison modes, built in-cluster via OpenShift `BuildConfig`.
 3. **`src/ui`**: Application source code (`app.py`, `Containerfile`, `requirements.txt`) containing the custom Gradio interface.
 
@@ -153,3 +153,28 @@ The following queries can be tested in the UI to compare responses from the base
 
 3. **Access Application**:
    Navigate to OpenShift Web Console -> **Networking** -> **Routes** in the `rag-llm` namespace to access the application URL.
+
+## OpenShift documentation corpus
+
+Enable `populateDbJob.enabled` to index the checked-in [4.22 portal snapshot](docs/openshift_4_22_portal_snapshot/).
+It reads `toc.json` and `index.jsonl` to prepend the heading path to every chunk and store the exact
+published section URL. Short sections remain searchable. The version is stored in metadata.
+The UI uses the stored URLs in the RAG and comparison views.
+
+The job reads the corpus from the Git repository and branch configured by `global.repoURL` and
+`global.targetRevision`, the same settings used to build the UI. Include the snapshot in the
+deployed revision before running the population job so PGVector can be rebuilt with the new
+chunks and citations.
+
+### GPU-assisted population
+
+For a one-time GPU rebuild, stop vLLM and verify that a GPU is allocatable. Enable
+`populateDbJob.enabled` and `populateDbJob.gpu.enabled` in the RAG Helm values.
+The job requests one NVIDIA GPU and runs a CUDA model warm-up before opening PostgreSQL.
+`populateDbJob.embeddingBatchSize` controls encoder batch size and defaults to 64. If CUDA runs out of memory, set it to 32.
+The job reports embedding, bulk COPY, and final publication timings separately.
+
+The population job stages the full index in PostgreSQL and publishes it in one
+transaction. The existing index remains available during embedding and is replaced
+only when the complete corpus is ready. Restart vLLM after the population job completes.
+For CPU ingestion, leave `populateDbJob.gpu.enabled` disabled.

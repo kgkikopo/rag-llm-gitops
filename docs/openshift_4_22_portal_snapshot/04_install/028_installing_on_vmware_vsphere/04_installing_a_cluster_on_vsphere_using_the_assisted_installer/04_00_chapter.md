@@ -1,0 +1,7 @@
+# Chapter 4. Installing a cluster on vSphere using the Assisted Installer
+
+You can install OpenShift Container Platform on on-premise hardware or on-premise VMs by using the Assisted Installer. Installing OpenShift Container Platform by using the Assisted Installer supports `x86_64`, `AArch64`, `ppc64le`, and `s390x` CPU architectures. 
+
+The Assisted Installer is a user-friendly installation solution offered on the Red Hat Hybrid Cloud Console.
+
+- [4.1. Additional resources](04_01_additional_resources.md)

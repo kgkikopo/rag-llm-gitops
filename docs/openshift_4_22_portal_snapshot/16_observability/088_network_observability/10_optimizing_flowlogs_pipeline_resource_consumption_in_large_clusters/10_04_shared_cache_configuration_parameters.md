@@ -1,0 +1,18 @@
+# 10.4. Shared cache configuration parameters
+
+Use the `FlowCollector` informer parameters to configure how the `flowlogs-pipeline` queries metadata from the Kubernetes API server, including cache settings and resource selection. 
+
+Note
+
+The shared cache feature uses centralized Kubernetes informers. Configure this feature in the `spec.processor.informerCacheProxy` field of the `FlowCollector` custom resource. 
+
+Table 10.1. Shared cache parametersParameter| Type| Default| Description  
+---|---|---|---  
+`enabled` |  Boolean  |  `false` |  Enables the shared cache architecture to centralize Kubernetes API metadata retrieval. When enabled, a dedicated `flowlogs-pipeline-informers` deployment queries the Kubernetes API server and distributes cached metadata to all `flowlogs-pipeline` instances through gRPC on port `9402`.   
+`replicas` |  Integer  |  `2` |  The number of shared cache pods to deploy. The minimum value is `2` to ensure high availability with leader election. The Operator enforces this requirement.   
+`resources` |  Object  |  See `FlowCollector` API  |  Configures CPU and memory resource requests and limits for the shared cache pods. Specify `requests.cpu`, `requests.memory`, `limits.cpu`, and `limits.memory` according to your cluster size and performance requirements.   
+`advanced.resyncInterval` |  Duration  |  `60` |  The interval, in seconds, at which the informer cache proxy rediscovers `flowlogs-pipeline` processor pods and synchronizes their state.   
+`advanced.batchSize` |  Integer  |  `100` |  The number of cache update events to batch together before sending to `flowlogs-pipeline` instances. Larger batches improve efficiency but increase latency for metadata updates.   
+`advanced.sendTimeout` |  Duration  |  `10` |  The maximum time to wait when sending cache updates to `flowlogs-pipeline` instances. If a send operation exceeds this timeout, the system retries the update.   
+`advanced.updateBufferSize` |  Integer  |  `100` |  The size of the internal buffer queue for cache updates. Increase this value in high-churn environments where Kubernetes resources change often.   
+Show more

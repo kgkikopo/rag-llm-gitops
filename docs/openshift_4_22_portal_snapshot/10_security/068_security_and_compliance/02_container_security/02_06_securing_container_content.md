@@ -1,0 +1,229 @@
+# 2.6. Securing container content
+
+To ensure the security of the content inside your containers you need to start with trusted base images, such as Red Hat Universal Base Images, and add trusted software. To check the ongoing security of your container images, there are both Red Hat and third-party tools for scanning images. 
+
+## 2.6.1. Secure inside the container
+
+For the security of your containers, you need to know where any source packages originally came from, what versions are used, who built them, and whether there is any malicious code inside them. 
+
+However, when using these packages, you should answer the following questions about the packages: 
+
+Containerized versions of these packages are also available. However, you need to know where the packages originally came from, what versions are used, who built them, and whether there is any malicious code inside them. 
+
+Some questions to answer include: 
+
+  * Will what is inside the containers compromise your infrastructure? 
+  * Are there known vulnerabilities in the application layer? 
+  * Are the runtime and operating system layers current? 
+
+
+
+By building your containers from Red Hat Universal Base Images (UBI) you are assured of a foundation for your container images that consists of the same RPM-packaged software that is included in Red Hat Enterprise Linux. No subscriptions are required to either use or redistribute UBI images. 
+
+To assure ongoing security of the containers themselves, security scanning features, used directly from RHEL or added to OpenShift Container Platform, can alert you when an image you are using has vulnerabilities. OpenSCAP image scanning is available in RHEL and the Red Hat Quay Container Security Operator can be added to check container images used in OpenShift Container Platform. 
+
+## 2.6.2. Create redistributable images with UBI
+
+You can typically start with a trusted base image that offers the components that are usually provided by the operating system to create containerized applications. These include the libraries, utilities, and other features the application expects to see in the operating system’s file system. 
+
+Red Hat Universal Base Images (UBI) were created to encourage anyone building their own containers to start with one that is made entirely from Red Hat Enterprise Linux RPM packages and other content. These UBI images are updated regularly to keep up with security patches and free to use and redistribute with container images built to include your own software. 
+
+Search the Red Hat Ecosystem Catalog to both find and check the health of different UBI images. As someone creating secure container images, you might be interested in these two general types of UBI images: 
+
+  * **UBI** : There are standard UBI images for RHEL 7, 8, and 9 (`ubi7/ubi`, `ubi8/ubi`, and `ubi9/ubi`), and minimal images based on those systems (`ubi7/ubi-minimal`, `ubi8/ubi-mimimal`, and ubi9/ubi-minimal). All of these images are preconfigured to point to free repositories of RHEL software that you can add to the container images you build, using standard `yum` and `dnf` commands. 
+
+Note
+
+Red Hat encourages people to use these images on other distributions, such as Fedora and Ubuntu. 
+
+  * **Red Hat Software Collections** : Search the Red Hat Ecosystem Catalog for `rhscl/` to find images created to use as base images for specific types of applications. For example, there are Apache httpd (`rhscl/httpd-*`), Python (`rhscl/python-*`), Ruby (`rhscl/ruby-*`), Node.js (`rhscl/nodejs-*`) and Perl (`rhscl/perl-*`) rhscl images. 
+
+
+
+Remember that while UBI images are freely available and redistributable, Red Hat support for these images is only available through Red Hat product subscriptions. 
+
+## 2.6.3. Security scanning in RHEL
+
+For Red Hat Enterprise Linux (RHEL) systems, OpenSCAP scanning is available from the `openscap-utils` package. In RHEL, you can use the `openscap-podman` command to scan images for vulnerabilities. 
+
+OpenShift Container Platform enables you to use RHEL scanners with your Continuous Integration and Continuous Delivery (CI/CD) process. For example, you can integrate static code analysis tools that test for security flaws in your source code and software composition analysis tools that identify open source libraries to provide metadata on those libraries such as known vulnerabilities. 
+
+### 2.6.3.1. Scanning OpenShift images
+
+For the container images that are running in OpenShift Container Platform and are pulled from Red Hat Quay registries, you can use an Operator to list the vulnerabilities of those images. The Red Hat Quay Container Security Operator can be added to OpenShift Container Platform to provide vulnerability reporting for images added to selected namespaces. 
+
+Container image scanning for Red Hat Quay is performed by Clair. In Red Hat Quay, Clair can search for and report vulnerabilities in images built from RHEL, CentOS, Oracle, Alpine, Debian, and Ubuntu operating system software. 
+
+## 2.6.4. Integrate external scanning
+
+OpenShift Container Platform makes use of object annotations to extend functionality. You can use external tools, such as vulnerability scanners, to annotate image objects with metadata to summarize results and control pod execution. 
+
+This section describes the recognized format of this annotation so it can be reliably used in consoles to display useful data to users. 
+
+### 2.6.4.1. Image metadata
+
+There are different types of image quality data, including package vulnerabilities and open source software (OSS) license compliance. Additionally, there might be more than one provider of this metadata. To that end, the following annotation format has been reserved: 
+
+```plaintext
+quality.images.openshift.io/<qualityType>.<providerId>: {}
+```
+
+
+Table 2.1. Annotation key formatComponent| Description| Acceptable values  
+---|---|---  
+`qualityType` |  Metadata type  |  `vulnerability`, `license`, `operations`, `policy`  
+`providerId` |  Provider ID string  |  `openscap`, `redhatcatalog`, `redhatinsights`, `blackduck`, `jfrog`  
+Show more
+
+The value of the image quality annotation is structured data that must adhere to the following format: 
+
+Table 2.2. Annotation value formatField| Required?| Description| Type  
+---|---|---|---  
+`name` |  Yes  |  Provider display name  |  String   
+`timestamp` |  Yes  |  Scan timestamp  |  String   
+`description` |  No  |  Short description  |  String   
+`reference` |  Yes  |  URL of information source or more details. Required so user might validate the data.  |  String   
+`scannerVersion` |  No  |  Scanner version  |  String   
+`compliant` |  No  |  Compliance pass or fail  |  Boolean   
+`summary` |  No  |  Summary of issues found  |  List (see table below)   
+Show more
+
+The `summary` field must adhere to the following format: 
+
+Table 2.3. Summary field value formatField| Description| Type  
+---|---|---  
+`label` |  Display label for component (for example, "critical," "important," "moderate," "low," or "health")  |  String   
+`data` |  Data for this component (for example, count of vulnerabilities found or score)  |  String   
+`severityIndex` |  Component index allowing for ordering and assigning graphical representation. The value is range `0..3` where `0` = low.  |  Integer   
+`reference` |  URL of information source or more details. Optional.  |  String   
+Show more
+
+#### 2.6.4.1.1. Example annotation keys
+
+The following text shows you example of four annotation keys. 
+
+```plaintext
+quality.images.openshift.io/vulnerability.blackduck: {}
+quality.images.openshift.io/vulnerability.jfrog: {}
+quality.images.openshift.io/license.blackduck: {}
+quality.images.openshift.io/vulnerability.openscap: {}
+```
+
+
+#### 2.6.4.1.2. Example annotation values
+
+This example shows an OpenSCAP annotation for an image with vulnerability summary data and a compliance boolean: 
+
+**OpenSCAP annotation**
+
+```plaintext
+{
+  "name": "OpenSCAP",
+  "description": "OpenSCAP vulnerability score",
+  "timestamp": "2016-09-08T05:04:46Z",
+  "reference": "https://www.open-scap.org/930492",
+  "compliant": true,
+  "scannerVersion": "1.2",
+  "summary": [
+    { "label": "critical", "data": "4", "severityIndex": 3, "reference": null },
+    { "label": "important", "data": "12", "severityIndex": 2, "reference": null },
+    { "label": "moderate", "data": "8", "severityIndex": 1, "reference": null },
+    { "label": "low", "data": "26", "severityIndex": 0, "reference": null }
+  ]
+}
+```
+
+
+This example shows the [Container images section of the Red Hat Ecosystem Catalog](https://catalog.redhat.com/software/containers/explore) annotation for an image with health index data with an external URL for additional details: 
+
+**Red Hat Ecosystem Catalog annotation**
+
+```plaintext
+{
+  "name": "Red Hat Ecosystem Catalog",
+  "description": "Container health index",
+  "timestamp": "2016-09-08T05:04:46Z",
+  "reference": "https://access.redhat.com/errata/RHBA-2016:1566",
+  "compliant": null,
+  "scannerVersion": "1.2",
+  "summary": [
+    { "label": "Health index", "data": "B", "severityIndex": 1, "reference": null }
+  ]
+}
+```
+
+
+### 2.6.4.2. Annotating image objects
+
+While image stream objects are what a user of OpenShift Container Platform operates against, image objects are annotated with security metadata. Image objects are cluster-scoped, pointing to a single image that might be referenced by many image streams and tags. 
+
+#### 2.6.4.2.1. Example annotate CLI command
+
+Replace `<image>` with an image digest, for example `sha256:401e359e0f45bfdcf004e258b72e253fd07fba8cc5c6f2ed4f4608fb119ecc2`: 
+
+```shell-session
+$ oc annotate image <image> \
+    quality.images.openshift.io/vulnerability.redhatcatalog='{ \
+    "name": "Red Hat Ecosystem Catalog", \
+    "description": "Container health index", \
+    "timestamp": "2020-06-01T05:04:46Z", \
+    "compliant": null, \
+    "scannerVersion": "1.2", \
+    "reference": "https://access.redhat.com/errata/RHBA-2020:2347", \
+    "summary": "[ \
+      { "label": "Health index", "data": "B", "severityIndex": 1, "reference": null } ]" }'
+```
+
+
+### 2.6.4.3. Controlling pod execution
+
+Use the `images.openshift.io/deny-execution` image policy to programmatically control if an image can be run. 
+
+#### 2.6.4.3.1. Example annotation
+
+The preceding YAML shows you an example annotation. 
+
+```yaml
+annotations:
+  images.openshift.io/deny-execution: true
+```
+
+
+### 2.6.4.4. Integration reference
+
+External tools such as vulnerability scanners typically develop a script or plugin that watches for image updates, performs scanning, and annotates the associated image object with the results by using OpenShift Container Platform REST APIs. 
+
+#### 2.6.4.4.1. Example REST API call
+
+The following example call by using `curl` overrides the value of the annotation. Be sure to replace the values for `<token>`, `<openshift_server>`, `<image_id>`, and `<image_annotation>`. 
+
+**Patch API call**
+
+```shell-session
+$ curl -X PATCH \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/merge-patch+json" \
+  https://<openshift_server>:6443/apis/image.openshift.io/v1/images/<image_id> \
+  --data '{ <image_annotation> }'
+```
+
+
+The following is an example of `PATCH` payload data: 
+
+**Patch call data**
+
+```shell-session
+{
+"metadata": {
+  "annotations": {
+    "quality.images.openshift.io/vulnerability.redhatcatalog":
+       "{ 'name': 'Red Hat Ecosystem Catalog', 'description': 'Container health index', 'timestamp': '2020-06-01T05:04:46Z', 'compliant': null, 'reference': 'https://access.redhat.com/errata/RHBA-2020:2347', 'summary': [{'label': 'Health index', 'data': '4', 'severityIndex': 1, 'reference': null}] }"
+    }
+  }
+}
+```
+
+
+**Additional resources**
+
+  * [Image stream objects](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/images/#overview-of-images)

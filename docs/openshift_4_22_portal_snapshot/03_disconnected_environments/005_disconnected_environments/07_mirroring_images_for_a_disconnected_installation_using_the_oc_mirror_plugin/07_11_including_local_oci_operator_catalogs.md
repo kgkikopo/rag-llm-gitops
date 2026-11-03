@@ -1,0 +1,128 @@
+# 7.11. Including local OCI Operator catalogs
+
+While mirroring OpenShift Container Platform releases, Operator catalogs, and additional images from a registry to a partially disconnected cluster, you can include Operator catalog images from a local file-based catalog on disk. 
+
+The local catalog must be in the Open Container Initiative (OCI) format. 
+
+The local catalog and its contents are mirrored to your target mirror registry based on the filtering information in the image set configuration file. 
+
+Important
+
+When mirroring local OCI catalogs, any OpenShift Container Platform releases or additional images that you want to mirror along with the local OCI-formatted catalog must be pulled from a registry. 
+
+You cannot mirror OCI catalogs along with an oc-mirror image set file on disk. 
+
+One example use case for using the OCI feature is if you have a CI/CD system building an OCI catalog to a location on disk, and you want to mirror that OCI catalog along with an OpenShift Container Platform release to your mirror registry. 
+
+Note
+
+If you used the Technology Preview OCI local catalogs feature for the oc-mirror plugin for OpenShift Container Platform 4.12, you can no longer use the OCI local catalogs feature of the oc-mirror plugin to copy a catalog locally and convert it to OCI format as a first step to mirroring to a fully disconnected cluster. 
+
+**Prerequisites**
+
+  * You have access to the internet to obtain the necessary container images. 
+  * You have installed the OpenShift CLI (`oc`). 
+  * You have installed the oc-mirror CLI plugin. 
+
+
+
+**Procedure**
+
+  1. Create the image set configuration file and adjust the settings as necessary. 
+
+The following example image set configuration mirrors an OCI catalog on disk along with an OpenShift Container Platform release and a UBI image from `registry.redhat.io`. 
+
+```yaml
+kind: ImageSetConfiguration
+apiVersion: mirror.openshift.io/v1alpha2
+storageConfig:
+  local:
+    path: /home/user/metadata
+mirror:
+  platform:
+    channels:
+    - name: stable-4.22
+      type: ocp
+    graph: false
+  operators:
+  - catalog: oci:///home/user/oc-mirror/my-oci-catalog
+    targetCatalog: my-namespace/redhat-operator-index
+    packages:
+    - name: aws-load-balancer-operator
+  - catalog: registry.redhat.io/redhat/redhat-operator-index:v4.22
+    packages:
+    - name: rhacs-operator
+  additionalImages:
+  - name: registry.redhat.io/ubi9/ubi:latest
+```
+
+
+where: 
+
+`storageConfig.local.path`
+     Specifies the back-end location to save the image set metadata to. This location can be a registry or local directory. It is required to specify `storageConfig` values. 
+`mirror.platform.channels.name`
+     Specifies an OpenShift Container Platform release to mirror from `registry.redhat.io`. This is optional. 
+`mirror.operators.catalog`
+     Specifies the absolute path to the location of the OCI catalog on disk. The path must start with `oci://` when using the OCI feature. Optionally, you can specify additional Operator catalogs to pull from a registry. 
+`mirror.operators.targetCatalog`
+     Specifies an alternative namespace and name to mirror the catalog as. This is optional. 
+`mirror.additionalImages.name`
+    
+
+Specifies additional images to pull from a registry. This is optional. 
+
+Note
+
+In oc-mirror plugin v2, you must use explicit registry hostnames for all images listed under `additionalImages`. Otherwise, images are mirrored to incorrect target paths. 
+
+  2. Run the `oc mirror` command to mirror the OCI catalog to a target mirror registry: 
+
+```shell-session
+$ oc mirror --config=./imageset-config.yaml \
+  docker://registry.example:5000 --v1
+```
+
+
+where: 
+
+`imageset-config.yaml`
+     Specifies the image set configuration file. This procedure assumes that it is named `imageset-config.yaml`. 
+`docker://`
+    
+
+Specifies the registry to mirror the content to. The registry must start with `docker://`. If you specify a top-level namespace for the mirror registry, you must also use this same namespace on subsequent executions. 
+
+Optionally, you can specify other flags to adjust the behavior of the OCI feature: 
+
+`--oci-insecure-signature-policy`
+     Do not push signatures to the target mirror registry. 
+`--oci-registries-config`
+    
+
+Specify the path to a TOML-formatted `registries.conf` file. You can use this to mirror from a different registry, such as a pre-production location for testing, without having to change the image set configuration file. This flag only affects local OCI catalogs, not any other mirrored content. 
+
+**Example registries.conf file**
+
+```plaintext
+[[registry]]
+ location = "registry.redhat.io:5000"
+ insecure = false
+ blocked = false
+ mirror-by-digest-only = true
+ prefix = ""
+ [[registry.mirror]]
+    location = "preprod-registry.example.com"
+    insecure = false
+```
+
+
+**Next steps**
+
+  * Configure your cluster to use the resources generated by oc-mirror. 
+
+
+
+**Additional resources**
+
+  * [Configuring your cluster to use the resources generated by oc-mirror](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/disconnected_environments/installing-mirroring-disconnected#oc-mirror-updating-cluster-manifests_installing-mirroring-disconnected "7.8. Configuring your cluster to use the resources generated by oc-mirror")

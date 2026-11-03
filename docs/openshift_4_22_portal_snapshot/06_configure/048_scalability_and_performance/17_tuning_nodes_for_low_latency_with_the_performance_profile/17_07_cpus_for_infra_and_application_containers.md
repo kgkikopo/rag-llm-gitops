@@ -1,0 +1,43 @@
+# 17.7. CPUs for infra and application containers
+
+Generic housekeeping and workload tasks use CPUs in a way that might impact latency-sensitive processes. By default, the container runtime uses all online CPUs to run all containers together, which can result in context switches and spikes in latency. 
+
+Partitioning the CPUs prevents noisy processes from interfering with latency-sensitive processes by separating them from each other. The following table describes how processes run on a CPU after you have tuned the node using the Node Tuning Operator: 
+
+Table 17.4. Process' CPU assignmentsProcess type| Details  
+---|---  
+`Burstable` and `BestEffort` pods  |  Runs on any CPU except where low latency workload is running   
+Infrastructure pods  |  Runs on any CPU except where low latency workload is running   
+Interrupts  |  Redirects to reserved CPUs (optional in OpenShift Container Platform 4.7 and later)   
+Kernel processes  |  Pins to reserved CPUs   
+Latency-sensitive workload pods  |  Pins to a specific set of exclusive CPUs from the isolated pool   
+OS processes/systemd services  |  Pins to reserved CPUs   
+Show more
+
+The allocatable capacity of cores on a node for pods of all QoS process types, `Burstable`, `BestEffort`, or `Guaranteed`, is equal to the capacity of the isolated pool. The capacity of the reserved pool is removed from the node’s total core capacity for use by the cluster and operating system housekeeping duties. 
+
+Example 1
+     A node features a capacity of 100 cores. Using a performance profile, the cluster administrator allocates 50 cores to the isolated pool and 50 cores to the reserved pool. The cluster administrator assigns 25 cores to QoS `Guaranteed` pods and 25 cores for `BestEffort` or `Burstable` pods. This matches the capacity of the isolated pool. 
+Example 2
+     A node features a capacity of 100 cores. Using a performance profile, the cluster administrator allocates 50 cores to the isolated pool and 50 cores to the reserved pool. The cluster administrator assigns 50 cores to QoS `Guaranteed` pods and one core for `BestEffort` or `Burstable` pods. This exceeds the capacity of the isolated pool by one core. Pod scheduling fails because of insufficient CPU capacity. 
+
+The exact partitioning pattern to use depends on many factors like hardware, workload characteristics and the expected system load. Some sample use cases are as follows: 
+
+  * If the latency-sensitive workload uses specific hardware, such as a network interface controller (NIC), ensure that the CPUs in the isolated pool are as close as possible to this hardware. At a minimum, you should place the workload in the same Non-Uniform Memory Access (NUMA) node. 
+  * The reserved pool is used for handling all interrupts. When depending on system networking, allocate a sufficiently-sized reserve pool to handle all the incoming packet interrupts. In 4.22 and later versions, workloads can optionally be labeled as sensitive. 
+
+
+
+The decision regarding which specific CPUs should be used for reserved and isolated partitions requires detailed analysis and measurements. Factors like NUMA affinity of devices and memory play a role. The selection also depends on the workload architecture and the specific use case. 
+
+To ensure that housekeeping tasks and workloads do not interfere with each other, specify two groups of CPUs in the `spec` section of the performance profile. 
+
+Important
+
+The reserved and isolated CPU pools must not overlap and together must span all available cores in the worker node. 
+
+Table 17.5. CPU partition typesPartition type| Description  
+---|---  
+`reserved` |  Specifies the CPUs for cluster and operating system housekeeping duties. Kernel processes and operating system services are pinned to these CPUs. When workload partitioning is enabled, platform pods are also pinned to these CPUs. Threads in the `reserved` group are often busy. The kubelet does not place `Guaranteed` pods that request exclusive CPUs on these CPUs. Do not run latency-sensitive applications in the `reserved` group.   
+`isolated` |  Specifies the CPUs for application container workloads. These CPUs have the lowest latency. Device interrupts can still be processed on this set unless you disable IRQ load balancing. The kubelet places `Guaranteed` pods that request exclusive CPUs on this set.   
+Show more

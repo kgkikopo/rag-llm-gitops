@@ -1,0 +1,36 @@
+# 3.15. Determine Kubernetes API transaction rate for your environment
+
+Test sustained Kubernetes API transaction rates for stretched control plane deployments by using `kube-burner-ocp` density profiles. Validate limits before production workloads exceed etcd capacity. 
+
+When you are using stretched control planes, the Kubernetes API transaction rate depends on the characteristics of the particular deployment. Specifically, it depends on the following combined factors: 
+
+  * The etcd disk latency 
+  * The etcd round trip time 
+  * The size of objects that are being written to the API 
+
+
+
+As a result, when you use stretched control planes, cluster administrators must test the environment to determine the sustained transaction rate that is possible for the environment. The `kube-burner` tool is useful for that purpose. The binary includes a wrapper for testing OpenShift clusters: `kube-burner-ocp`. You can use `kube-burner-ocp` to test cluster or node density. 
+
+To test the control plane, `kube-burner-ocp` has three workload profiles: `cluster-density`, `cluster-density-v2`, and `cluster-density-ms`. Each workload profile creates a series of resources that are designed to load the control plane. For more information about each profile, see the `kube-burner-ocp` workload documentation. 
+
+**Procedure**
+
+  1. Enter a command to create and delete resources. The following example shows a command that creates and deletes resources within 20 minutes: 
+
+```shell-session
+# kube-burner ocp cluster-density-ms --churn-duration 20m --churn-delay 0s --iterations 10 --timeout 30m
+```
+
+
+  2. The OpenShift Container Platform console provides a dashboard with all the relevant API performance information. To access API performance information, click **Observe** **Dashboards**. From the **Dashboards** menu, click **API Performance**. 
+  3. During the run, observe the API performance dashboard in the OpenShift Container Platform console by clicking **Observe** **Dashboards**. From the **Dashboards** menu, click **API Performance**. 
+
+On the dashboard, notice how the control plane responds during load and the 99th percentile transaction rate it can achieve for the execution of various verbs and request rates by read and write. Use this information and the knowledge of your organization’s workload to determine the load that the organization can put in the clusters for the specific stretched control plane deployment. 
+
+
+
+
+**Additional resources**
+
+  * [kube-burner-ocp documentation](https://kube-burner.github.io/kube-burner-ocp/latest/)

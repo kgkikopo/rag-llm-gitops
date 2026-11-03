@@ -1,0 +1,15 @@
+# Chapter 1. Machine APIs
+
+- [1.1. ContainerRuntimeConfig [machineconfiguration.openshift.io/v1]](01_01_containerruntimeconfig_machineconfiguration_openshift_io_v1.md)
+- [1.2. ControllerConfig [machineconfiguration.openshift.io/v1]](01_02_controllerconfig_machineconfiguration_openshift_io_v1.md)
+- [1.3. ControlPlaneMachineSet [machine.openshift.io/v1]](01_03_controlplanemachineset_machine_openshift_io_v1.md)
+- [1.4. KubeletConfig [machineconfiguration.openshift.io/v1]](01_04_kubeletconfig_machineconfiguration_openshift_io_v1.md)
+- [1.5. MachineConfig [machineconfiguration.openshift.io/v1]](01_05_machineconfig_machineconfiguration_openshift_io_v1.md)
+- [1.6. MachineConfigPool [machineconfiguration.openshift.io/v1]](01_06_machineconfigpool_machineconfiguration_openshift_io_v1.md)
+- [1.7. MachineHealthCheck [machine.openshift.io/v1beta1]](01_07_machinehealthcheck_machine_openshift_io_v1beta1.md)
+- [1.8. Machine [machine.openshift.io/v1beta1]](01_08_machine_machine_openshift_io_v1beta1.md)
+- [1.9. MachineSet [machine.openshift.io/v1beta1]](01_09_machineset_machine_openshift_io_v1beta1.md)
+- [1.10. MachineConfigNode [machineconfiguration.openshift.io/v1]](01_10_machineconfignode_machineconfiguration_openshift_io_v1.md)
+- [1.11. MachineOSBuild [machineconfiguration.openshift.io/v1]](01_11_machineosbuild_machineconfiguration_openshift_io_v1.md)
+- [1.12. MachineOSConfig [machineconfiguration.openshift.io/v1]](01_12_machineosconfig_machineconfiguration_openshift_io_v1.md)
+- [1.13. PinnedImageSet [machineconfiguration.openshift.io/v1]](01_13_pinnedimageset_machineconfiguration_openshift_io_v1.md)

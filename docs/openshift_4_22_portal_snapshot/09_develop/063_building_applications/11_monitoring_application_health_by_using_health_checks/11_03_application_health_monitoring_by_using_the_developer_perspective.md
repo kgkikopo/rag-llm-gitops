@@ -1,0 +1,13 @@
+# 11.3. Application health monitoring by using the Developer perspective
+
+You can monitor application health by adding readiness, liveness, and startup probes from the **Developer** perspective, either when you deploy an application or on a deployed application. Probes detect unhealthy containers and keep applications available before failures affect users. 
+
+You can use the **Developer** perspective to add three types of health probes to your container to ensure that your application is healthy: 
+
+  * Use a readiness probe to check if the container is ready to handle requests. 
+  * Use a liveness probe to check if the container is running. 
+  * Use a startup probe to check if the application within the container has started. 
+
+
+
+You can add health checks either while creating and deploying an application, or after you have deployed an application.

@@ -1,0 +1,147 @@
+# 11.2. Configuring health checks using the CLI
+
+To configure readiness, liveness, and startup probes, add one or more probes to the specification for the pod that contains the container on which you want to perform the health checks. Probes let the cluster detect unhealthy containers and respond before failures affect application availability. 
+
+Note
+
+If you want to add or edit health checks in an existing pod, you must edit the pod `DeploymentConfig` object or use the web console. You cannot use the CLI to add or edit health checks for an existing pod. 
+
+**Procedure**
+
+  1. Create a YAML file that defines a `Pod` object with one or more probes: 
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    test: health-check
+  name: my-application
+spec:
+  containers:
+  - name: my-container
+    args:
+    image: registry.k8s.io/goproxy:0.1
+    livenessProbe:
+      tcpSocket:
+        port: 8080
+      initialDelaySeconds: 15
+      periodSeconds: 20
+      timeoutSeconds: 10
+    readinessProbe:
+      httpGet:
+        host: my-host
+        scheme: HTTPS
+        path: /healthz
+        port: 8080
+    startupProbe:
+      exec:
+        command:
+        - cat
+        - /tmp/healthy
+      failureThreshold: 30
+      periodSeconds: 20
+      timeoutSeconds: 10
+```
+
+
+Note
+
+Include only the probe types your application needs. The example shows liveness, readiness, and startup probes together for reference. 
+
+where: 
+
+`spec.containers.name`
+     Specifies the container name. 
+`spec.containers.image`
+     Specifies the container image to deploy. 
+`spec.containers.livenessProbe`
+     Specifies a liveness probe. This value is optional. 
+`spec.containers.livenessProbe.tcpSocket`
+     Specifies a test to perform, here a Transmission Control Protocol (TCP) socket test. 
+`spec.containers.livenessProbe.tcpSocket.port`
+     Specifies the port on which the container is listening. 
+`spec.containers.livenessProbe.initialDelaySeconds`
+     Specifies the time, in seconds, after the container starts before the probe can be scheduled. 
+`spec.containers.livenessProbe.periodSeconds`
+     Specifies the number of seconds to perform the probe. The default is `10`. This value must be greater than `timeoutSeconds`. 
+`spec.containers.livenessProbe.timeoutSeconds`
+     Specifies the number of seconds of inactivity after which the probe is assumed to have failed. The default is `1`. This value must be lower than `periodSeconds`. 
+`spec.containers.readinessProbe`
+     Specifies a readiness probe. This value is optional. 
+`spec.containers.readinessProbe.httpGet`
+     Specifies the type of test to perform, here an HTTP test. 
+`spec.containers.readinessProbe.httpGet.host`
+     Specifies a host IP address. When `host` is not defined, the `PodIP` is used. 
+`spec.containers.readinessProbe.httpGet.scheme`
+     Specifies `HTTP` or `HTTPS`. When `scheme` is not defined, the `HTTP` scheme is used. 
+`spec.containers.readinessProbe.httpGet.port`
+     Specifies the port on which the container is listening. 
+`spec.containers.startupProbe`
+     Specifies a startup probe. This value is optional. 
+`spec.containers.startupProbe.exec`
+     Specifies the type of test to perform, here a container execution probe. 
+`spec.containers.startupProbe.exec.command`
+     Specifies the commands to execute on the container. 
+`spec.containers.startupProbe.failureThreshold`
+     Specifies the number of times to try the probe after a failure. 
+`spec.containers.startupProbe.periodSeconds`
+     Specifies the number of seconds to perform the probe. The default is `10`. This value must be greater than `timeoutSeconds`. 
+`spec.containers.startupProbe.timeoutSeconds`
+    
+
+Specifies the number of seconds of inactivity after which the probe is assumed to have failed. The default is `1`. This value must be lower than `periodSeconds`. 
+
+Note
+
+If the `initialDelaySeconds` value is lower than the `periodSeconds` value, the first readiness probe occurs at some point between the two periods due to an issue with timers. 
+
+The `timeoutSeconds` value must be lower than the `periodSeconds` value. 
+
+  2. Apply the YAML file by running the following command: 
+
+```shell-session
+$ oc create -f <file-name>.yaml
+```
+
+
+  3. Verify the state of the health check pod by running the following command: 
+
+```shell-session
+$ oc describe pod my-application
+```
+
+
+**Example output**
+
+```shell-session
+Events:
+  Type    Reason     Age   From                                  Message
+  ----    ------     ----  ----                                  -------
+  Normal  Scheduled  9s    default-scheduler                     Successfully assigned openshift-logging/liveness-exec to ip-10-0-143-40.ec2.internal
+  Normal  Pulling    2s    kubelet, ip-10-0-143-40.ec2.internal  pulling image "registry.k8s.io/liveness"
+  Normal  Pulled     1s    kubelet, ip-10-0-143-40.ec2.internal  Successfully pulled image "registry.k8s.io/liveness"
+  Normal  Created    1s    kubelet, ip-10-0-143-40.ec2.internal  Created container
+  Normal  Started    1s    kubelet, ip-10-0-143-40.ec2.internal  Started container
+```
+
+
+The following example shows output when a liveness probe fails and the container is restarted: 
+
+```shell-session
+....
+
+Events:
+  Type     Reason          Age                From                                               Message
+  ----     ------          ----               ----                                               -------
+  Normal   Scheduled       <unknown>                                                             Successfully assigned aaa/liveness-http to ci-ln-37hz77b-f76d1-wdpjv-worker-b-snzrj
+  Normal   AddedInterface  47s                multus                                             Add eth0 [10.129.2.11/23]
+  Normal   Pulled          46s                kubelet, ci-ln-37hz77b-f76d1-wdpjv-worker-b-snzrj  Successfully pulled image "registry.k8s.io/liveness" in 773.406244ms
+  Normal   Pulled          28s                kubelet, ci-ln-37hz77b-f76d1-wdpjv-worker-b-snzrj  Successfully pulled image "registry.k8s.io/liveness" in 233.328564ms
+  Normal   Created         10s (x3 over 46s)  kubelet, ci-ln-37hz77b-f76d1-wdpjv-worker-b-snzrj  Created container liveness
+  Normal   Started         10s (x3 over 46s)  kubelet, ci-ln-37hz77b-f76d1-wdpjv-worker-b-snzrj  Started container liveness
+  Warning  Unhealthy       10s (x6 over 34s)  kubelet, ci-ln-37hz77b-f76d1-wdpjv-worker-b-snzrj  Liveness probe failed: HTTP probe failed with statuscode: 500
+  Normal   Killing         10s (x2 over 28s)  kubelet, ci-ln-37hz77b-f76d1-wdpjv-worker-b-snzrj  Container liveness failed liveness probe, will be restarted
+  Normal   Pulling         10s (x3 over 47s)  kubelet, ci-ln-37hz77b-f76d1-wdpjv-worker-b-snzrj  Pulling image "registry.k8s.io/liveness"
+  Normal   Pulled          10s                kubelet, ci-ln-37hz77b-f76d1-wdpjv-worker-b-snzrj  Successfully pulled image "registry.k8s.io/liveness" in 244.116568ms
+```

@@ -1,0 +1,71 @@
+# 2.3. Hardening RHCOS
+
+If you are planning to harden RHCOS nodes in OpenShift Container Platform to meet your security needs, you should consider both what to harden and how to go about doing that hardening. 
+
+RHCOS was created and tuned to be deployed in OpenShift Container Platform with few if any changes needed to RHCOS nodes. Every organization adopting OpenShift Container Platform has its own requirements for system hardening. As a RHEL system with OpenShift-specific modifications and features added (such as Ignition, ostree, and a read-only `/usr` to provide limited immutability), RHCOS can be hardened just as you would any RHEL system. Differences lie in the ways you manage the hardening. 
+
+A key feature of OpenShift Container Platform and its Kubernetes engine is to be able to quickly scale applications and infrastructure up and down as needed. Unless it is unavoidable, you do not want to make direct changes to RHCOS by logging into a host and adding software or changing settings. You want to have the OpenShift Container Platform installer and control plane manage changes to RHCOS so new nodes can be spun up without manual intervention. 
+
+So, if you are setting out to harden RHCOS nodes in OpenShift Container Platform to meet your security needs, you should consider both what to harden and how to go about doing that hardening. 
+
+## 2.3.1. Choose what to harden in RHCOS
+
+You can review the information on how to approach security for any RHEL system in the Red Hat Enterprise Linux 9 Security Hardening guide. 
+
+Use this guide to learn how to approach cryptography, evaluate vulnerabilities, and assess threats to various services. Likewise, you can learn how to scan for compliance standards, check file integrity, perform auditing, and encrypt storage devices. 
+
+With the knowledge of what features you want to harden, you can then decide how to harden them in RHCOS. 
+
+**Additional resources**
+
+  * [Red Hat Enterprise Linux 9 Security Hardening guide](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html-single/security_hardening/index#scanning-container-and-container-images-for-vulnerabilities_scanning-the-system-for-security-compliance-and-vulnerabilities)
+
+
+
+## 2.3.2. Choose how to harden RHCOS
+
+Direct modification of RHCOS systems in OpenShift Container Platform is discouraged. Instead, you should think of modifying systems in pools of nodes, such as worker nodes and control plane nodes. 
+
+When a new node is needed, in non-bare metal installs, you can request a new node of the type you want and it will be created from an RHCOS image plus the modifications you created earlier. 
+
+There are opportunities for modifying RHCOS before installation, during installation, and after the cluster is up and running. 
+
+### 2.3.2.1. Hardening before installation
+
+For bare-metal installations, you can add hardening features to RHCOS before beginning the OpenShift Container Platform installation. For example, you can add kernel options when you boot the RHCOS installer to turn security features on or off, such as various SELinux Boolean values or low-level settings, such as symmetric multithreading. 
+
+Warning
+
+Disabling SELinux on RHCOS nodes is not supported. 
+
+Although bare metal RHCOS installations are more difficult, they offer the opportunity of getting operating system changes in place before starting the OpenShift Container Platform installation. This can be important when you need to ensure that certain features, such as disk encryption or special networking settings, be set up at the earliest possible moment. 
+
+### 2.3.2.2. Hardening during installation
+
+You can interrupt the OpenShift Container Platform installation process and change Ignition configs. Through Ignition configs, you can add your own files and systemd services to the RHCOS nodes. You can also make some basic security-related changes to the `install-config.yaml` file used for installation. Contents added in this way are available at each node’s first boot. 
+
+### 2.3.2.3. Hardening after the cluster is running
+
+After the OpenShift Container Platform cluster is up and running, there are several ways to apply hardening features to RHCOS: 
+
+  * Daemon set: If you need a service to run on every node, you can add that service with a Kubernetes `DaemonSet` object. 
+  * Machine config: `MachineConfig` objects contain a subset of Ignition configs in the same format. By applying machine configs to all worker or control plane nodes, you can ensure that the next node of the same type that is added to the cluster has the same changes applied. 
+
+
+
+All of the features noted here are described in the OpenShift Container Platform product documentation. 
+
+**Additional resources**
+
+  * [Kubernetes DaemonSet documentation](https://kubernetes.io/docs/concepts/workloads/controllers/daemonset/)
+  * [OpenShift Security Guide](https://access.redhat.com/articles/5059881)
+  * [Choosing how to configure RHCOS](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/architecture/#rhcos-deployed_architecture-rhcos)
+  * [Modifying Nodes](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/#nodes-nodes-managing)
+  * [Manually creating the installation configuration file](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_bare_metal/#installation-initializing-manual_installing-bare-metal)
+  * [Creating the Kubernetes manifest and Ignition config files](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_bare_metal/#installation-user-infra-generate-k8s-manifest-ignition_installing-bare-metal)
+  * [Installing RHCOS by using an ISO image](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_bare_metal/#installation-user-infra-machines-iso_installing-bare-metal)
+  * [Customizing nodes](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installation_configuration/#installing-customizing)
+  * [Add kernel arguments to nodes](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/#nodes-nodes-kernel-arguments_nodes-nodes-managing)
+  * [Optional configuration parameters](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_aws/#installation-configuration-parameters-optional_installation-config-parameters-aws)
+  * [Support for FIPS cryptography](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installation_overview/#installing-fips)
+  * [RHEL core crypto components](https://access.redhat.com/articles/3359851)

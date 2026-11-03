@@ -1,0 +1,82 @@
+# 9.2. Configure a custom OIDC discovery URL
+
+Configure a custom OIDC discovery URL when your identity provider does not follow the standard discovery endpoint format. 
+
+**Prerequisites**
+
+  * You have configured an external OIDC identity provider for direct authentication. 
+  * You have access to the cluster as a user with the `cluster-admin` role. 
+  * You have access to a long-lived authentication method, such as a certificate-based kubeconfig file. 
+
+
+
+**Procedure**
+
+  1. Create a YAML file named `authentication-discovery-url.yaml` with your custom discovery URL configuration: 
+
+```yaml
+apiVersion: config.openshift.io/v1
+kind: Authentication
+metadata:
+  name: cluster
+spec:
+  type: OIDC
+  oidcProviders:
+  - name: my-oidc-provider
+    issuer:
+      issuerURL: https://idp.example.com
+      discoveryURL: https://custom-discovery.example.com/.well-known/openid-configuration
+      audiences:
+      - my-audience
+    claimMappings:
+      username:
+        claim: email
+```
+
+
+where: 
+
+`issuerURL`
+     Specifies the issuer URL displayed in JWT token `iss` claim. 
+`discoveryURL`
+    
+
+Specifies the custom OIDC discovery endpoint URL. Must differ from `issuerURL`, use HTTPS, and must not contain query parameters, fragments, or user info. Maximum length: 2048 characters. 
+
+Note
+
+Replace the placeholder values (`my-oidc-provider`, `<https://idp.example.com>`, `<https://custom-discovery.example.com/.well-known/openid-configuration>`, `my-audience`) with your actual OIDC provider configuration. 
+
+  2. Apply the configuration: 
+
+```shell-session
+$ oc apply -f authentication-discovery-url.yaml
+```
+
+
+**Verification**
+
+  * Monitor the cluster authentication Operator status to ensure the configuration is applied successfully: 
+
+```shell-session
+$ oc get clusteroperator authentication
+```
+
+
+The Operator should report `Available=True` and `Degraded=False`. 
+
+  * Check the cluster authentication Operator logs for any errors: 
+
+```shell-session
+$ oc logs -n openshift-authentication-operator deployments/authentication-operator
+```
+
+
+  * Verify the kube-apiserver is using the custom discovery URL by checking the authentication configuration: 
+
+```shell-session
+$ oc get authentication.config.openshift.io/cluster -o jsonpath='{.spec.oidcProviders[0].issuer.discoveryURL}'
+```
+
+
+The output should display your custom discovery URL.

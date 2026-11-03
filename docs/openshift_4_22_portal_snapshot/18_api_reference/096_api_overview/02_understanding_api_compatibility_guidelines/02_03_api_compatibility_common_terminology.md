@@ -1,0 +1,53 @@
+# 2.3. API compatibility common terminology
+
+This glossary defines common terms for OpenShift Container Platform API compatibility, including APIs, the Application Operating Environment (AOE), release version types, and support tiers. 
+
+## 2.3.1. Application Programming Interface (API)
+
+An API is a public interface implemented by a software program that enables it to interact with other software. In OpenShift Container Platform, the API is served from a centralized API server and is used as the hub for all system interaction. 
+
+## 2.3.2. Application Operating Environment (AOE)
+
+An AOE is the integrated environment that executes the end-user application program. The AOE is a containerized environment that provides isolation from the host operating system (OS). At a minimum, AOE allows the application to run in an isolated manner from the host OS libraries and binaries, but still share the same OS kernel as all other containers on the host. The AOE is enforced at runtime and it describes the interface between an application and its operating environment. It includes intersection points between the platform, operating system and environment, with the user application including projection of downward API, DNS, resource accounting, device access, platform workload identity, isolation among containers, isolation between containers and host OS. 
+
+The AOE does not include components that might vary by installation, such as Container Network Interface (CNI) plugin selection or extensions to the product such as admission hooks. Components that integrate with the cluster at a level below the container environment might be subjected to additional variation between versions. 
+
+## 2.3.3. Compatibility in a virtualized environment
+
+Virtual environments emulate bare-metal environments such that unprivileged applications that run on bare-metal environments will run, unmodified, in corresponding virtual environments. Virtual environments present simplified abstracted views of physical resources, so some differences might exist. 
+
+## 2.3.4. Compatibility in a cloud environment
+
+OpenShift Container Platform might choose to offer integration points with a hosting cloud environment via cloud provider specific integrations. The compatibility of these integration points are specific to the guarantee provided by the native cloud vendor and its intersection with the OpenShift Container Platform compatibility window. Where OpenShift Container Platform provides an integration with a cloud environment natively as part of the default installation, Red Hat develops against stable cloud API endpoints to provide commercially reasonable support with forward looking compatibility that includes stable deprecation policies. Example areas of integration between the cloud provider and OpenShift Container Platform include, but are not limited to, dynamic volume provisioning, service load balancer integration, pod workload identity, dynamic management of compute, and infrastructure provisioned as part of initial installation. 
+
+## 2.3.5. Major, minor, and z-stream releases
+
+A Red Hat major release represents a significant step in the development of a product. Minor releases appear more frequently within the scope of a major release and represent deprecation boundaries that might impact future application compatibility. A z-stream release is an update to a minor release which provides a stream of continuous fixes to an associated minor release. API and AOE compatibility is never broken in a z-stream release except when this policy is explicitly overridden in order to respond to an unforeseen security impact. 
+
+For example, in the release 4.13.2: 
+
+  * 4 is the major release version 
+  * 13 is the minor release version 
+  * 2 is the z-stream release version 
+
+
+
+## 2.3.6. Extended user support (EUS)
+
+A minor release in an OpenShift Container Platform major release that has an extended support window for critical bug fixes. Users are able to migrate between EUS releases by incrementally adopting minor versions between EUS releases. It is important to note that the deprecation policy is defined across minor releases and not EUS releases. As a result, an EUS user might have to respond to a deprecation when migrating to a future EUS while sequentially upgrading through each minor release. 
+
+## 2.3.7. Developer Preview
+
+An optional product capability that is not officially supported by Red Hat, but is intended to provide a mechanism to explore early phase technology. By default, Developer Preview functionality is opt-in, and subject to removal at any time. Enabling a Developer Preview feature might render a cluster unsupportable dependent upon the scope of the feature. 
+
+If you are a Red( )Hat customer or partner and have feedback about these developer preview versions, file an issue by using the OpenShift Bugs tracker. Do not use the formal Red( )Hat support service ticket process. 
+
+## 2.3.8. Technology Preview
+
+An optional product capability that provides early access to upcoming product innovations to test functionality and provide feedback during the development process. The feature is not fully supported, might not be functionally complete, and is not intended for production use. Usage of a Technology Preview function requires explicit opt-in. 
+
+## 2.3.9. Additional resources
+
+  * [OpenShift Bugs tracker](https://issues.redhat.com/projects/OCPBUGS/issues)
+  * [Developer Preview support handling](https://access.redhat.com/support/offerings/devpreview)
+  * [Technology Preview Features Support Scope](https://access.redhat.com/support/offerings/techpreview)

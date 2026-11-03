@@ -1,0 +1,96 @@
+# 1.3. Automatically pruning images
+
+To reclaim storage in the OpenShift image registry in OpenShift Container Platform and define image retention period, you can configure the automatic image pruner. 
+
+You set the schedule, suspension, and retention options on the pruning custom resource (CR). 
+
+**Prerequisites**
+
+  * You have access to an OpenShift Container Platform cluster using an account with cluster administrator permissions. 
+  * Install the `oc` CLI. 
+
+
+
+Important
+
+The behavior of the Image Registry Operator for managing the pruner is independent to the `managementState` specified on the `ClusterOperator` object of the Image Registry Operator. If the Image Registry Operator is not in the `Managed` state, the image pruner can still be configured and managed by the Pruning Custom Resource. 
+
+However, the `managementState` of the Image Registry Operator alters the behavior of the deployed image pruner job: 
+
+  * `Managed`: the `--prune-registry` flag for the image pruner is set to `true`. 
+  * `Removed`: the `--prune-registry` flag for the image pruner is set to `false`, meaning it only prunes image metadata in etcd. 
+
+
+
+**Procedure**
+
+  * Verify that the object named `imagepruners.imageregistry.operator.openshift.io/cluster` contains the following `spec` and `status` fields: 
+
+```yaml
+spec:
+  schedule: 0 0 * * *
+  suspend: false
+  keepTagRevisions: 3
+  keepYoungerThanDuration: 60m
+  keepYoungerThan: 3600000000000
+  resources: {}
+  affinity: {}
+  nodeSelector: {}
+  tolerations: []
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+status:
+  observedGeneration: 2
+  conditions:
+  - type: Available
+    status: "True"
+    lastTransitionTime: 2019-10-09T03:13:45
+    reason: Ready
+    message: "Periodic image pruner has been created."
+  - type: Scheduled
+    status: "True"
+    lastTransitionTime: 2019-10-09T03:13:45
+    reason: Scheduled
+    message: "Image pruner job has been scheduled."
+  - type: Failed
+    staus: "False"
+    lastTransitionTime: 2019-10-09T03:13:45
+    reason: Succeeded
+    message: "Most recent image pruning job succeeded."
+```
+
+
+where: 
+
+`spec.schedule`
+     `CronJob` formatted schedule. This is an optional field, default is daily at midnight. 
+`spec.suspend`
+     If set to `true`, the `CronJob` running pruning is suspended. This is an optional field, default is `false`. The initial value on new clusters is `false`. 
+`spec.keepTagRevisions`
+     The number of revisions per tag to keep. This is an optional field, default is `3`. The initial value is `3`. 
+`spec.keepYoungerThanDuration`
+     Retain images younger than this duration. This is an optional field. If a value is not specified, either `keepYoungerThan` or the default value `60m` (60 minutes) is used. 
+`spec.keepYoungerThan`
+     Deprecated. The same as `keepYoungerThanDuration`, but the duration is specified as an integer in nanoseconds. This is an optional field. When `keepYoungerThanDuration` is set, this field is ignored. 
+`spec.resources`
+     Standard pod resource requests and limits. This is an optional field. 
+`spec.affinity`
+     Standard pod affinity. This is an optional field. 
+`nodeSelector`
+     Standard pod node selector. This is an optional field. 
+`spec.tolerations`
+     Standard pod tolerations. This is an optional field. 
+`spec.successfulJobsHistoryLimit`
+     The maximum number of successful jobs to retain. Must be greater than or equal to `1` to ensure metrics are reported. This is an optional field, default is `3`. The initial value is `3`. 
+`spec.failedJobsHistoryLimit`
+     The maximum number of failed jobs to retain. Must be greater than or equal `1` to ensure metrics are reported. This is an optional field, default is `3`. The initial value is `3`. 
+`status.observedGeneration`
+     The generation observed by the Operator. 
+`status.conditions`
+    
+
+The standard condition objects with the following types: 
+
+    * `Available`: Indicates if the pruning job has been created. Reasons can be `Ready` or `Error`. 
+    * `Scheduled`: Indicates if the next pruning job has been scheduled. Reasons can be `Scheduled`, `Suspended`, or `Error`. 
+    * `Failed`: Indicates if the most recent pruning job failed.

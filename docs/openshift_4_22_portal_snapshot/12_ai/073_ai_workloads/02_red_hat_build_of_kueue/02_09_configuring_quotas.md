@@ -1,0 +1,233 @@
+# 2.9. Configuring quotas
+
+As an administrator, you can use Red Hat build of Kueue to configure quotas to optimize resource allocation and system throughput for user workloads. You can configure quotas for compute resources such as CPU, memory, pods, and GPU. 
+
+You can configure quotas in Red Hat build of Kueue by completing the following steps: 
+
+  1. Configure a cluster queue. 
+  2. Configure a resource flavor. 
+  3. Configure a local queue. 
+
+
+
+Users can then submit their workloads to the local queue. 
+
+## 2.9.1. Configuring a cluster queue
+
+A cluster queue is a cluster-scoped resource, represented by a `ClusterQueue` object, that governs a pool of resources such as CPU, memory, and pods. 
+
+Cluster queues can be used to define usage limits, quotas for resource flavors, order of consumption, and fair sharing rules. 
+
+Note
+
+The cluster queue is not ready for use until a `ResourceFlavor` object has also been configured. 
+
+**Prerequisites**
+
+  * The Red Hat build of Kueue Operator is installed on your cluster. 
+  * You have cluster administrator permissions or the `kueue-batch-admin-role` role. 
+  * You have installed the OpenShift CLI (`oc`). 
+
+
+
+**Procedure**
+
+  1. Create a `ClusterQueue` object as a YAML file: 
+
+**Example of a basic`ClusterQueue` object using a single resource flavor**
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ClusterQueue
+metadata:
+  name: cluster-queue
+spec:
+  namespaceSelector: {}
+  resourceGroups:
+  - coveredResources: ["cpu", "memory", "pods", "foo.com/gpu"]
+    flavors:
+    - name: "default-flavor"
+      resources:
+      - name: "cpu"
+        nominalQuota: 9
+      - name: "memory"
+        nominalQuota: 36Gi
+      - name: "pods"
+        nominalQuota: 5
+      - name: "foo.com/gpu"
+        nominalQuota: 100
+```
+
+
+where: 
+
+`spec.namespaceSelector`
+     Specifies which namespaces can use the resources governed by this cluster queue. An empty `namespaceSelector` as shown in the example means that all namespaces can use these resources. 
+`spec.resourceGroups[].coveredResources`
+     Specifies the resource types governed by the cluster queue. This example `ClusterQueue` object governs CPU, memory, pod, and GPU resources. 
+`spec.resourceGroups[].flavors[].name`
+     Specifies the resource flavor that is applied to the resource types listed. In this example, the `default-flavor` resource flavor is applied to CPU, memory, pod, and GPU resources. 
+`spec.resourceGroups[].flavors[].resources`
+    
+
+Specifies the resource requirements for admitting jobs. This example cluster queue only admits jobs if the following conditions are met: 
+
+     * The sum of the CPU requests is less than or equal to 9. 
+     * The sum of the memory requests is less than or equal to 36Gi. 
+     * The total number of pods is less than or equal to 5. 
+     * The sum of the GPU requests is less than or equal to 100. 
+
+  2. Apply the `ClusterQueue` object by running the following command: 
+
+```shell-session
+$ oc apply -f <filename>.yaml
+```
+
+
+**Next steps**
+
+The cluster queue is not ready for use until a [`ResourceFlavor` object](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/ai_workloads/red-hat-build-of-kueue#configuring-resourceflavors_configuring-quotas "2.9.2. Configuring a resource flavor") has also been configured. 
+
+## 2.9.2. Configuring a resource flavor
+
+After you have configured a `ClusterQueue` object, you can configure a `ResourceFlavor` object. 
+
+Resources in a cluster are typically not homogeneous. If the resources in your cluster are homogeneous, you can use an empty `ResourceFlavor` instead of adding labels to custom resource flavors. 
+
+You can use a custom `ResourceFlavor` object to represent different resource variations that are associated with cluster nodes through labels, taints, and tolerations. You can then associate workloads with specific node types to enable fine-grained resource management. 
+
+**Prerequisites**
+
+  * The Red Hat build of Kueue Operator is installed on your cluster. 
+  * You have cluster administrator permissions or the `kueue-batch-admin-role` role. 
+  * You have installed the OpenShift CLI (`oc`). 
+
+
+
+**Procedure**
+
+  1. Create a `ResourceFlavor` object as a YAML file: 
+
+**Example of an empty`ResourceFlavor` object**
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: default-flavor
+```
+
+
+**Example of a custom`ResourceFlavor` object**
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: ResourceFlavor
+metadata:
+  name: "x86"
+spec:
+  nodeLabels:
+    cpu-arch: x86
+```
+
+
+  2. Apply the `ResourceFlavor` object by running the following command: 
+
+```shell-session
+$ oc apply -f <filename>.yaml
+```
+
+
+## 2.9.3. Configuring a local queue
+
+A local queue is a namespaced object, represented by a `LocalQueue` object, that groups closely related workloads that belong to a single namespace. 
+
+As an administrator, you can configure a `LocalQueue` object to point to a cluster queue. This allocates resources from the cluster queue to workloads in the namespace specified in the `LocalQueue` object. 
+
+**Prerequisites**
+
+  * The Red Hat build of Kueue Operator is installed on your cluster. 
+  * You have cluster administrator permissions or the `kueue-batch-admin-role` role. 
+  * You have installed the OpenShift CLI (`oc`). 
+  * You have created a `ClusterQueue` object. 
+
+
+
+**Procedure**
+
+  1. Create a `LocalQueue` object as a YAML file: 
+
+**Example of a basic`LocalQueue` object**
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: team-namespace
+  name: user-queue
+spec:
+  clusterQueue: cluster-queue
+```
+
+
+  2. Apply the `LocalQueue` object by running the following command: 
+
+```shell-session
+$ oc apply -f <filename>.yaml
+```
+
+
+## 2.9.4. Configuring a default local queue
+
+As a cluster administrator, you can improve quota enforcement in your cluster by managing all jobs in selected namespaces without needing to explicitly label each job. You can do this by creating a default local queue. 
+
+A default local queue serves as the local queue for newly created jobs that do not have the `kueue.x-k8s.io/queue-name` label. After you create a default local queue, any new jobs created in the namespace without a `kueue.x-k8s.io/queue-name` label automatically update to have the `kueue.x-k8s.io/queue-name: default` label. 
+
+Important
+
+Preexisting jobs in a namespace are not affected when you create a default local queue. If jobs already exist in the namespace before you create the default local queue, you must label those jobs explicitly to assign them to a queue. 
+
+**Prerequisites**
+
+  * You have installed Red Hat build of Kueue version 1.1 on your cluster. 
+  * You have cluster administrator permissions or the `kueue-batch-admin-role` role. 
+  * You have installed the OpenShift CLI (`oc`). 
+  * You have created a `ClusterQueue` object. 
+
+
+
+**Procedure**
+
+  1. Create a `LocalQueue` object named `default` as a YAML file: 
+
+**Example of a default`LocalQueue` object**
+
+```yaml
+apiVersion: kueue.x-k8s.io/v1beta2
+kind: LocalQueue
+metadata:
+  namespace: team-namespace
+  name: default
+spec:
+  clusterQueue: cluster-queue
+```
+
+
+  2. Apply the `LocalQueue` object by running the following command: 
+
+```shell-session
+$ oc apply -f <filename>.yaml
+```
+
+
+**Verification**
+
+  1. Create a job in the same namespace as the default local queue. 
+  2. Observe that the job updates with the `kueue.x-k8s.io/queue-name: default` label. 
+
+
+
+## 2.9.5. Additional resources
+
+  * [RBAC permissions](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/ai_workloads/red-hat-build-of-kueue#rbac-permissions "2.8. Configuring role-based permissions")
+  * [Kubernetes documentation about cluster queues](https://kueue.sigs.k8s.io/docs/concepts/cluster_queue/)

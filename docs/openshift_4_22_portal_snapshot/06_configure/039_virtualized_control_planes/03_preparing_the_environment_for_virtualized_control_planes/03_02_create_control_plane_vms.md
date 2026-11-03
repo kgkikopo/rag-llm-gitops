@@ -1,0 +1,138 @@
+# 3.2. Create control plane VMs
+
+Create VMs on the hosting cluster that will become the control plane nodes for your virtualized control plane cluster. 
+
+**Prerequisites**
+
+  * KubeVirt Redfish is installed and configured on the hosting cluster. 
+  * The hosting cluster has a network configured to provide Layer 2 connectivity between VMs. 
+
+
+
+**Procedure**
+
+  1. Enable the `RebootPolicy` feature gate on the hosting cluster by running the following command: 
+
+```shell-session
+$ oc annotate --overwrite -n openshift-cnv hyperconverged kubevirt-hyperconverged \
+    kubevirt.kubevirt.io/jsonpatch='[{"op":"add","path":"/spec/configuration/developerConfiguration/featureGates/-","value":"RebootPolicy"}]'
+```
+
+
+Note
+
+The `RebootPolicy` feature gate enables the `rebootPolicy` field in `VirtualMachine` specifications. This configuration is required when using KubeVirt Redfish for cluster installation. The feature gate is enabled through an annotation on the `HyperConverged` resource, which propagates the configuration to the underlying `KubeVirt` CR. 
+
+  2. Enable the `declarativeHotplugVolumes` feature gate on the hosting cluster by running the following command: 
+
+```shell-session
+$ oc patch hyperconverged kubevirt-hyperconverged -n openshift-cnv \
+    --type merge \
+    -p '{"spec": {"featureGates": {"declarativeHotplugVolumes": true}}}'
+```
+
+
+Note
+
+The `declarativeHotplugVolumes` feature gate enables KubeVirt Redfish to dynamically attach boot media to VMs through the Redfish API. This configuration is required when using KubeVirt Redfish for cluster installation. 
+
+  3. Create a `VirtualMachine` CR for each control plane node by creating a YAML file with content such as the following example: 
+
+```yaml
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: master-0
+  namespace: <vm_namespace>
+  labels:
+    redfish-enabled: "true"
+spec:
+  runStrategy: Halted
+  template:
+    metadata:
+      labels:
+        redfish-enabled: "true"
+    spec:
+      domain:
+        rebootPolicy: Terminate
+        cpu:
+          cores: 8
+        memory:
+          guest: 16Gi
+        devices:
+          disks:
+            - name: rootdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+            - name: default
+              bridge: {}
+      networks:
+        - name: default
+          multus:
+            networkName: <network_attachment_definition>
+      volumes:
+        - name: rootdisk
+          dataVolume:
+            name: master-0-disk
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            userData: |
+              #cloud-config
+              hostname: master-0
+              user: core
+```
+
+
+where: 
+
+     * `<vm_namespace>` specifies the namespace for the VMs. Must match the namespace specified in the KubeVirt Redfish chassis configuration. 
+     * `redfish-enabled: "true"` specifies the label that must match the `vm_selector` labels in the KubeVirt Redfish configuration so the VM is exposed through the Redfish API. 
+     * `runStrategy: Halted` specifies that VMs must be powered off initially. The installation powers them on by using the Redfish API. 
+     * `rebootPolicy: Terminate` specifies the reboot behavior required for Redfish API boot override operations. Ensures the VM terminates cleanly when boot media changes. 
+     * `cores: 8` and `guest: 16Gi` specify the minimum recommended resources for control plane nodes. 
+     * `<network_attachment_definition>` specifies the name of a `NetworkAttachmentDefinition` configured on your hosting cluster. All control plane VMs must share the same L2 network segment. Common options include localnet, Linux bridge, or OVN Layer 2 networks. 
+
+Important
+
+For production deployments, configure anti-affinity rules to ensure control plane VMs are distributed across different physical nodes. This prevents a single node failure from affecting multiple control plane VMs simultaneously. Add pod anti-affinity rules or topology spread constraints to the VM specification based on your environment requirements. 
+
+  4. Apply the resource by running the following command: 
+
+```shell-session
+$ oc apply -f master-0.yaml
+```
+
+
+If required, create further VMs for `master-1` and `master-2`, for example. 
+
+**Verification**
+
+  * Verify that the VMs are created and powered off by running the following command: 
+
+```shell-session
+$ oc get vm -n <vm_namespace>
+```
+
+
+  * `vm_namespace` is the namespace of the VMs. 
+
+**Example output**
+
+```shell-session
+NAME       AGE   STATUS    READY
+master-0   1m    Stopped   False
+master-1   1m    Stopped   False
+master-2   1m    Stopped   False
+```
+
+
+  * Verify that KubeVirt Redfish can discover the VMs by querying the Redfish API: 
+
+```shell-session
+$ curl -sk -u "<username>:<password>" \
+    https://<kubevirt_redfish_route>/redfish/v1/Systems
+```

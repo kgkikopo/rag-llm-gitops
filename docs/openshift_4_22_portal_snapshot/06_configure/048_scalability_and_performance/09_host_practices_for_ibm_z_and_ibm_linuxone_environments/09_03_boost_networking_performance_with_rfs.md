@@ -1,0 +1,62 @@
+# 9.3. Boost networking performance with RFS
+
+To boost networking performance, activate Receive Flow Steering (RFS) by using the Machine Config Operator (MCO). This configuration improves packet processing efficiency. 
+
+RFS extends Receive Packet Steering (RPS) by further reducing network latency. RFS is technically based on RPS, and improves the efficiency of packet processing by increasing the CPU cache hit rate. RFS achieves this, while considering queue length, by determining the most convenient CPU for computation so that cache hits are more likely to occur within the CPU. This means that the CPU cache is invalidated less and requires fewer cycles to rebuild the cache, which reduces packet processing run time. 
+
+**Procedure**
+
+  1. Copy the following MCO sample profile into a YAML file. For example, `enable-rfs.yaml`: 
+
+```yaml
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: 50-enable-rfs
+spec:
+  config:
+    ignition:
+      version: 2.2.0
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=US-ASCII,%23%20turn%20on%20Receive%20Flow%20Steering%20%28RFS%29%20for%20all%20network%20interfaces%0ASUBSYSTEM%3D%3D%22net%22%2C%20ACTION%3D%3D%22add%22%2C%20RUN%7Bprogram%7D%2B%3D%22/bin/bash%20-c%20%27for%20x%20in%20/sys/%24DEVPATH/queues/rx-%2A%3B%20do%20echo%208192%20%3E%20%24x/rps_flow_cnt%3B%20%20done%27%22%0A
+        filesystem: root
+        mode: 0644
+        path: /etc/udev/rules.d/70-persistent-net.rules
+      - contents:
+          source: data:text/plain;charset=US-ASCII,%23%20define%20sock%20flow%20enbtried%20for%20%20Receive%20Flow%20Steering%20%28RFS%29%0Anet.core.rps_sock_flow_entries%3D8192%0A
+        filesystem: root
+        mode: 0644
+        path: /etc/sysctl.d/95-enable-rps.conf
+```
+
+
+  2. Create the MCO profile by entering the following command: 
+
+```shell-session
+$ oc create -f enable-rfs.yaml
+```
+
+
+  3. Verify that an entry named `50-enable-rfs` is listed by entering the following command: 
+
+```shell-session
+$ oc get mc
+```
+
+
+  4. To deactivate the MCO profile, enter the following command: 
+
+```shell-session
+$ oc delete mc 50-enable-rfs
+```
+
+
+**Additional resources**
+
+  * [OpenShift Container Platform on IBM Z®: Tune your network performance with RFS](https://developer.ibm.com/tutorials/red-hat-openshift-on-ibm-z-tune-your-network-performance-with-rfs/)
+  * [Configuring Receive Flow Steering (RFS)](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/performance_tuning_guide/sect-red_hat_enterprise_linux-performance_tuning_guide-networking-configuration_tools#sect-Red_Hat_Enterprise_Linux-Performance_Tuning_Guide-Configuration_tools-Configuring_Receive_Flow_Steering_RFS)
+  * [Scaling in the Linux Networking Stack](https://www.kernel.org/doc/Documentation/networking/scaling.txt)

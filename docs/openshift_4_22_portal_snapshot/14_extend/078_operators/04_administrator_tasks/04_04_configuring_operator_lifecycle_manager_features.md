@@ -1,0 +1,76 @@
+# 4.4. Configuring Operator Lifecycle Manager features
+
+Cluster administrators can enable or disable Operator Lifecycle Manager (OLM) cluster features by editing the `OLMConfig` custom resource (CR) named `cluster` in OpenShift Container Platform. 
+
+## 4.4.1. Disabling copied CSVs
+
+To reduce memory, etcd, and network usage on large OpenShift Container Platform clusters, you can disable copied cluster service versions (CSVs) for Operators installed in `AllNamespaces` mode through the cluster `OLMConfig`. 
+
+When an Operator is installed by Operator Lifecycle Manager (OLM), a simplified copy of its cluster service version (CSV) is created by default in every namespace that the Operator is configured to watch. These CSVs are known as _copied CSVs_ and communicate to users which controllers are actively reconciling resource events in a given namespace. 
+
+When an Operator is configured to use the `AllNamespaces` install mode, versus targeting a single or specified set of namespaces, a copied CSV for the Operator is created in every namespace on the cluster. On especially large clusters, with namespaces and installed Operators potentially in the hundreds or thousands, copied CSVs consume an untenable amount of resources, such as OLM’s memory usage, cluster etcd limits, and networking. 
+
+Note
+
+If you disable copied CSVs, an Operator installed in `AllNamespaces` mode has their CSV copied only to the `openshift` namespace, instead of every namespace on the cluster. In disabled copied CSVs mode, the behavior differs between the web console and CLI: 
+
+  * In the web console, the default behavior is modified to show copied CSVs from the `openshift` namespace in every namespace, even though the CSVs are not actually copied to every namespace. This allows regular users to still be able to view the details of these Operators in their namespaces and create related custom resources (CRs). 
+  * In the OpenShift CLI (`oc`), regular users can view Operators installed directly in their namespaces by using the `oc get csvs` command, but the copied CSVs from the `openshift` namespace are not visible in their namespaces. Operators affected by this limitation are still available and continue to reconcile events in the user’s namespace. 
+
+To view a full list of installed global Operators, similar to the web console behavior, all authenticated users can run the following command: 
+
+```shell-session
+$ oc get csvs -n openshift
+```
+
+
+**Procedure**
+
+  * Edit the `OLMConfig` object named `cluster` and set the `spec.features.disableCopiedCSVs` field to `true`: 
+
+```shell-session
+$ oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1
+kind: OLMConfig
+metadata:
+  name: cluster
+spec:
+  features:
+    disableCopiedCSVs: true
+EOF
+```
+
+
+where: 
+
+`spec.features.disableCopiedCSVs`
+     Disables copied CSVs for `AllNamespaces` install mode Operators when set to `true`. 
+
+
+
+
+**Verification**
+
+  * When copied CSVs are disabled, OLM captures this information in an event in the Operator’s namespace: 
+
+```shell-session
+$ oc get events
+```
+
+
+**Example output**
+
+```shell-session
+LAST SEEN   TYPE      REASON               OBJECT                                MESSAGE
+85s         Warning   DisabledCopiedCSVs   clusterserviceversion/my-csv.v1.0.0   CSV copying disabled for operators/my-csv.v1.0.0
+```
+
+
+When the `spec.features.disableCopiedCSVs` field is missing or set to `false`, OLM recreates the copied CSVs for all Operators installed with the `AllNamespaces` mode and deletes the previously mentioned events. 
+
+
+
+
+**Additional resources**
+
+  * [Install modes](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/operators/understanding-operators#olm-operatorgroups-membership_olm-understanding-operatorgroups "2.4.5.2. Operator group membership")

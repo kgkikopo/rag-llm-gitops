@@ -1,0 +1,14 @@
+# 11.7. Additional resources
+
+* [Using the on-cluster image mode to apply a custom layered image](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/machine_configuration/mco-coreos-layering#coreos-layering-configuring-on-proc_mco-coreos-layering "11.3.2. Using the on-cluster image mode to apply a custom layered image")
+  * [Removing an on-cluster custom layered image](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/machine_configuration/mco-coreos-layering#coreos-layering-configuring-on-remove_mco-coreos-layering "11.3.6. Removal of an on-cluster custom layered image")
+  * [Pausing the machine config pools](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/#update-using-custom-machine-config-pools-pause_update-using-custom-machine-config-pools)
+  * [Rebuild an on-cluster custom layered image](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/machine_configuration/mco-coreos-layering#coreos-layering-configuring-on-rebuild_mco-coreos-layering "11.3.4. Rebuild an on-cluster custom layered image")
+  * [Reverting an on-cluster custom layered image](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/machine_configuration/mco-coreos-layering#coreos-layering-configuring-on-revert_mco-coreos-layering "11.3.5. Reverting an on-cluster custom layered image")
+  * [Modifying a custom layered image](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/machine_configuration/mco-coreos-layering#coreos-layering-configuring-on-modifying_mco-coreos-layering "11.3.3. Modify an on-cluster custom layered image")
+  * [About checking machine config node status](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/machine_configuration/machine-config-index#checking-mco-node-status_machine-config-overview "1.6. About node status during updates")
+  * [Updating the global cluster pull secret](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/images/#images-update-global-pull-secret_using-image-pull-secrets)
+  * [Enabling features using feature gates](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/#nodes-cluster-enabling-features)
+  * [Update with a RHCOS custom layered image](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/machine_configuration/mco-coreos-layering#coreos-layering-updating_mco-coreos-layering "11.6. Update with a RHCOS custom layered image")
+  * [What is a Hotfix package? (Red Hat Knowledgebase article)](https://access.redhat.com/solutions/2996001)
+  * [Download Red Hat Enterprise Linux Packages](https://access.redhat.com/downloads/content/479/ver=/rhel---9/9.1/x86_64/packages)

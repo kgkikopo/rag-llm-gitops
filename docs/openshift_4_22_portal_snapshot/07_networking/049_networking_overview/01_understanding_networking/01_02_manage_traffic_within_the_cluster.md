@@ -1,0 +1,12 @@
+# 1.2. Manage traffic within the cluster
+
+Your applications need to communicate with each other inside the cluster. OpenShift Container Platform provides two primary mechanisms that you can use to handle internal traffic: direct pod-to-pod communication for simple exchanges and robust service discovery for reliable connections. 
+
+Pod-to-pod communication
+     Pods communicate directly by using the unique IP addresses assigned by the pod network. A pod on one node can send traffic directly to a pod on another node without any network address translation (NAT). This direct communication model is efficient for services that need to exchange data quickly. Applications can simply target the IP address of another pod to establish a connection. 
+Service discovery with DNS
+    
+
+Pods need a reliable way to find each other because pod IP addresses are ephemeral. OpenShift Container Platform uses `CoreDNS`, a built-in DNS server, to provide this service discovery. 
+
+Every service you create automatically receives a stable DNS name. A pod can use this DNS name to connect to the service. The DNS system resolves the name to the service’s stable `ClusterIP` address. This process ensures reliable communication even when individual pod IPs change.

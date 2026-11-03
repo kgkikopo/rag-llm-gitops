@@ -1,0 +1,290 @@
+# 8.12. Export a virtual machine
+
+Export a virtual machine (VM) and its associated disks to import it into another cluster, or for another use case, such as forensic volume analysis. 
+
+You create a `VirtualMachineExport` custom resource (CR) by using the command-line interface. 
+
+Alternatively, you can use the `virtctl vmexport` command to create a `VirtualMachineExport` CR and to download exported volumes. 
+
+Note
+
+You can migrate virtual machines between OpenShift Virtualization clusters by using the Migration Toolkit for Virtualization. 
+
+## 8.12.1. Create a VirtualMachineExport custom resource
+
+You can create a `VirtualMachineExport` custom resource (CR) to export the persistent volume claims (PVCs) of a virtual machine (VM), a VM snapshot, or a single PVC. The export provides links for downloading the volume. 
+
+You can export the following objects: 
+
+  * VM: Exports the persistent volume claims of a specified VM. 
+  * VM snapshot: Exports PVCs contained in a `VirtualMachineSnapshot` CR. 
+  * PVC: Exports a PVC. If the PVC is used by another pod, such as the `virt-launcher` pod, the export remains in a `Pending` state until the PVC is no longer in use. 
+
+
+
+The `VirtualMachineExport` CR creates internal and external links for the exported volumes. Internal links are valid within the cluster. External links can be accessed by using an `Ingress` or `Route`. 
+
+The export server supports the following file formats: 
+
+  * `raw`: Raw disk image file. 
+  * `gzip`: Compressed disk image file. 
+  * `dir`: PVC directory and files. 
+  * `tar.gz`: Compressed PVC file. 
+
+
+
+**Prerequisites**
+
+  * The VM must be shut down for a VM export. 
+  * You have installed the OpenShift CLI (`oc`). 
+
+
+
+**Procedure**
+
+  1. Create a `VirtualMachineExport` manifest to export a volume from a `VirtualMachine`, `VirtualMachineSnapshot`, or `PersistentVolumeClaim` CR according to the following example and save it as `example-export.yaml`. 
+
+`VirtualMachineExport` example: 
+
+```yaml
+apiVersion: export.kubevirt.io/v1beta1
+kind: VirtualMachineExport
+metadata:
+  name: example-export
+spec:
+  source:
+    apiGroup: "kubevirt.io"
+    kind: VirtualMachine
+    name: example-vm
+  ttlDuration: 1h
+```
+
+
+     * `spec.source.apiGroup` defines the API group of the resource that you want to export: 
+
+       * Use `"kubevirt.io"` for `VirtualMachine`. 
+       * Use `"snapshot.kubevirt.io"` for `VirtualMachineSnapshot`. 
+       * Use `""` for `PersistentVolumeClaim`. 
+
+     * `spec.source.kind` defines the data source for the export. There are three primary values used for this field: 
+
+       * `VirtualMachine`
+       * `VirtualMachineSnapshot`
+       * `PersistentVolumeClaim`
+
+     * `spec.ttlDuration` defines the length of time before the export resource is automatically deleted. The default is 2 hours. 
+
+  2. Create the `VirtualMachineExport` CR: 
+
+```shell-session
+$ oc create -f example-export.yaml
+```
+
+
+  3. Get the `VirtualMachineExport` CR: 
+
+```shell-session
+$ oc get vmexport example-export -o yaml
+```
+
+
+The internal and external links for the exported volumes are displayed in the `status` stanza: 
+
+Output example: 
+
+```yaml
+apiVersion: export.kubevirt.io/v1beta1
+kind: VirtualMachineExport
+metadata:
+  name: example-export
+  namespace: example
+spec:
+  source:
+    apiGroup: ""
+    kind: PersistentVolumeClaim
+    name: example-pvc
+  tokenSecretRef: example-token
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2022-06-21T14:10:09Z"
+    reason: podReady
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2022-06-21T14:09:02Z"
+    reason: pvcBound
+    status: "True"
+    type: PVCReady
+  links:
+    external:
+      cert: |-
+        -----BEGIN CERTIFICATE-----
+        ...
+        -----END CERTIFICATE-----
+      volumes:
+      - formats:
+        - format: raw
+          url: https://vmexport-proxy.test.net/api/export.kubevirt.io/v1beta1/namespaces/example/virtualmachineexports/example-export/volumes/example-disk/disk.img
+        - format: gzip
+          url: https://vmexport-proxy.test.net/api/export.kubevirt.io/v1beta1/namespaces/example/virtualmachineexports/example-export/volumes/example-disk/disk.img.gz
+        name: example-disk
+    internal:
+      cert: |-
+        -----BEGIN CERTIFICATE-----
+        ...
+        -----END CERTIFICATE-----
+      volumes:
+      - formats:
+        - format: raw
+          url: https://virt-export-example-export.example.svc/volumes/example-disk/disk.img
+        - format: gzip
+          url: https://virt-export-example-export.example.svc/volumes/example-disk/disk.img.gz
+        name: example-disk
+  phase: Ready
+  serviceName: virt-export-example-export
+```
+
+
+     * `status.links.external` defines external links that are accessible from outside the cluster by using an `Ingress` or `Route`. 
+     * `status.links.internal` defines internal links that are valid only inside the cluster. 
+
+
+
+
+## 8.12.2. Access exported VM manifests
+
+You can retrieve the `VirtualMachine` manifest from the export server after you export a virtual machine (VM) or a VM snapshot. Use the manifest to create the VM on a target cluster. 
+
+**Prerequisites**
+
+  * You have installed the OpenShift CLI (`oc`). 
+  * You exported a virtual machine or VM snapshot by creating a `VirtualMachineExport` custom resource (CR). 
+
+Note
+
+`VirtualMachineExport` objects that have the `spec.source.kind: PersistentVolumeClaim` parameter do not generate virtual machine manifests. 
+
+
+
+
+**Procedure**
+
+  1. To access the manifests, you must first copy the certificates from the source cluster to the target cluster. 
+
+     1. Log in to the source cluster. 
+     2. Save the certificates to the `cacert.crt` file by running the following command: 
+
+```shell-session
+$ oc get vmexport <export_name> -o jsonpath={.status.links.external.cert} > cacert.crt
+```
+
+
+Replace `<export_name>` with the `metadata.name` value from the `VirtualMachineExport` object. 
+
+     3. Copy the `cacert.crt` file to the target cluster. 
+
+  2. Decode the token in the source cluster and save it to the `token_decode` file by running the following command: 
+
+```shell-session
+$ oc get secret export-token-<export_name> -o jsonpath={.data.token} | base64 --decode > token_decode
+```
+
+
+Replace `<export_name>` with the `metadata.name` value from the `VirtualMachineExport` object. 
+
+  3. Copy the `token_decode` file to the target cluster. 
+  4. Get the `VirtualMachineExport` custom resource by running the following command: 
+
+```shell-session
+$ oc get vmexport <export_name> -o yaml
+```
+
+
+  5. Review the `status.links` stanza, which is divided into `external` and `internal` sections. Note the `manifests.url` fields within each section, for example: 
+
+```yaml
+apiVersion: export.kubevirt.io/v1beta1
+kind: VirtualMachineExport
+metadata:
+  name: example-export
+spec:
+  source:
+    apiGroup: "kubevirt.io"
+    kind: VirtualMachine
+    name: example-vm
+  tokenSecretRef: example-token
+status:
+#...
+  links:
+    external:
+#...
+      manifests:
+      - type: all
+        url: https://vmexport-proxy.test.net/api/export.kubevirt.io/v1beta1/namespaces/example/virtualmachineexports/example-export/external/manifests/all
+      - type: auth-header-secret
+        url: https://vmexport-proxy.test.net/api/export.kubevirt.io/v1beta1/namespaces/example/virtualmachineexports/example-export/external/manifests/secret
+    internal:
+#...
+      manifests:
+      - type: all
+        url: https://virt-export-export-pvc.default.svc/internal/manifests/all
+      - type: auth-header-secret
+        url: https://virt-export-export-pvc.default.svc/internal/manifests/secret
+  phase: Ready
+  serviceName: virt-export-example-export
+```
+
+
+     * `status.links.external.manifests.url` where the `type` is `all` contains the `VirtualMachine` manifest, `DataVolume` manifest, if present, and a `ConfigMap` manifest that contains the public certificate for the external URL’s ingress or route. 
+     * `status.links.external.manifests.url` where the `type` is `auth-header-secret` contains a secret containing a header that is compatible with Containerized Data Importer (CDI). The header contains a text version of the export token. 
+
+  6. Log in to the target cluster. 
+  7. Get the `Secret` manifest by running the following command: 
+
+```shell-session
+$ curl --cacert cacert.crt <secret_manifest_url> -H \
+"x-kubevirt-export-token:token_decode" -H \
+"Accept:application/yaml"
+```
+
+
+     * Replace `<secret_manifest_url>` with an `auth-header-secret` URL from the `VirtualMachineExport` YAML output. 
+     * Reference the `token_decode` file that you created earlier. 
+
+For example: 
+
+```shell-session
+$ curl --cacert cacert.crt https://vmexport-proxy.test.net/api/export.kubevirt.io/v1beta1/namespaces/example/virtualmachineexports/example-export/external/manifests/secret -H "x-kubevirt-export-token:token_decode" -H "Accept:application/yaml"
+```
+
+
+  8. Get the manifests of `type: all`, such as the `ConfigMap` and `VirtualMachine` manifests, by running the following command: 
+
+```shell-session
+$ curl --cacert cacert.crt <all_manifest_url> -H \
+"x-kubevirt-export-token:token_decode" -H \
+"Accept:application/yaml"
+```
+
+
+     * Replace `<all_manifest_url>` with a URL from the `VirtualMachineExport` YAML output. 
+     * Reference the `token_decode` file that you created earlier. 
+
+For example: 
+
+```shell-session
+$ curl --cacert cacert.crt https://vmexport-proxy.test.net/api/export.kubevirt.io/v1beta1/namespaces/example/virtualmachineexports/example-export/external/manifests/all -H "x-kubevirt-export-token:token_decode" -H "Accept:application/yaml"
+```
+
+
+**Next steps**
+
+  * You can now create the `ConfigMap` and `VirtualMachine` objects on the target cluster by using the exported manifests. 
+
+
+
+## 8.12.3. Additional resources
+
+  * [Migration Toolkit for Virtualization](https://access.redhat.com/products/migration-toolkits-virtualization)
+  * [virtctl vmexport command](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/getting-started#vm-export-commands_virt-using-the-cli-tools "3.2.7. VM export commands")

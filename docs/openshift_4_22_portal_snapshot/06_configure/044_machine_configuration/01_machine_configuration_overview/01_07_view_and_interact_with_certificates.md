@@ -1,0 +1,112 @@
+# 1.7. View and interact with certificates
+
+You can secure connections between Red Hat Enterprise Linux CoreOS (RHCOS) nodes and the Machine Config Server by viewing, interacting with, and extracting detailed information from Machine Config Operator and image registry certificates. 
+
+For more information, see "Machine Config Operator certificates". 
+
+The following certificates are handled in the cluster by the Machine Config Controller (MCC) and can be found in the `ControllerConfig` resource: 
+
+  * `/etc/kubernetes/kubelet-ca.crt`
+  * `/etc/kubernetes/static-pod-resources/configmaps/cloud-config/ca-bundle.pem`
+  * `/etc/pki/ca-trust/source/anchors/openshift-config-user-ca-bundle.crt`
+
+
+
+The MCC also handles the image registry certificates and its associated user bundle certificate. 
+
+You can get information about the listed certificates, including the underyling bundle the certificate comes from, and the signing and subject data. 
+
+**Prerequisites**
+
+  * This procedure contains optional steps that require that the `python-yq` RPM package is installed. 
+
+
+
+**Procedure**
+
+  * Get detailed certificate information by running the following command: 
+
+```shell-session
+$ oc get controllerconfig/machine-config-controller -o yaml | yq -y '.status.controllerCertificates'
+```
+
+
+**Example output**
+
+```yaml
+- bundleFile: KubeAPIServerServingCAData
+  notAfter: '2034-10-23T13:13:02Z'
+  notBefore: '2024-10-25T13:13:02Z'
+  signer: CN=admin-kubeconfig-signer,OU=openshift
+  subject: CN=admin-kubeconfig-signer,OU=openshift
+- bundleFile: KubeAPIServerServingCAData
+  notAfter: '2024-10-26T13:13:05Z'
+  notBefore: '2024-10-25T13:27:14Z'
+  signer: CN=kubelet-signer,OU=openshift
+  subject: CN=kube-csr-signer_@1729862835
+- bundleFile: KubeAPIServerServingCAData
+  notAfter: '2024-10-26T13:13:05Z'
+  notBefore: '2024-10-25T13:13:05Z'
+  signer: CN=kubelet-signer,OU=openshift
+  subject: CN=kubelet-signer,OU=openshift
+# ...
+```
+
+
+  * Get a simpler version of the information found in the `ControllerConfig` resource by checking the machine config pool status using the following command: 
+
+```shell-session
+$ oc get mcp master -o yaml | yq -y '.status.certExpirys'
+```
+
+
+**Example output**
+
+```yaml
+- bundle: KubeAPIServerServingCAData
+  expiry: '2034-10-23T13:13:02Z'
+  subject: CN=admin-kubeconfig-signer,OU=openshift
+- bundle: KubeAPIServerServingCAData
+  expiry: '2024-10-26T13:13:05Z'
+  subject: CN=kube-csr-signer_@1729862835
+- bundle: KubeAPIServerServingCAData
+  expiry: '2024-10-26T13:13:05Z'
+  subject: CN=kubelet-signer,OU=openshift
+- bundle: KubeAPIServerServingCAData
+  expiry: '2025-10-25T13:13:05Z'
+  subject: CN=kube-apiserver-to-kubelet-signer,OU=openshift
+# ...
+```
+
+
+This method is meant for OpenShift Container Platform applications that already consume machine config pool information. 
+
+  * Check which image registry certificates are on the nodes: 
+
+    1. Log in to a node: 
+
+```shell-session
+$ oc debug node/<node_name>
+```
+
+
+    2. Set `/host` as the root directory within the debug shell: 
+
+```shell-session
+sh-5.1# chroot /host
+```
+
+
+    3. Look at the contents of the `/etc/docker/cert.d` directory: 
+
+```shell-session
+sh-5.1# ls /etc/docker/certs.d
+```
+
+
+**Example output**
+
+```shell-session
+image-registry.openshift-image-registry.svc.cluster.local:5000
+image-registry.openshift-image-registry.svc:5000
+```

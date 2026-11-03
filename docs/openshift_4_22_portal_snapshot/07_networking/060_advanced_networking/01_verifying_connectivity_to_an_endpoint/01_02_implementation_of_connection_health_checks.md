@@ -1,0 +1,79 @@
+# 1.2. Implementation of connection health checks
+
+The connectivity check controller orchestrates connection verification checks in your cluster. The results for the connection tests are stored in `PodNetworkConnectivity` objects in the `openshift-network-diagnostics` namespace. Connection tests are performed every minute in parallel. 
+
+The Cluster Network Operator (CNO) deploys several resources to the cluster to send and receive connectivity health checks: 
+
+Health check source
+     This program deploys in a single pod replica set managed by a `Deployment` object. The program consumes `PodNetworkConnectivity` objects and connects to the `spec.targetEndpoint` specified in each object. 
+Health check target
+     A pod deployed as part of a daemon set on every node in the cluster. The pod listens for inbound health checks. The presence of this pod on every node allows for the testing of connectivity to each node. 
+
+You can configure the nodes which network connectivity sources and targets run on with a node selector. Additionally, you can specify permissible _tolerations_ for source and target pods. The configuration is defined in the singleton `cluster` custom resource of the `Network` API in the `config.openshift.io/v1` API group. 
+
+Pod scheduling occurs after you have updated the configuration. Therefore, you must apply node labels that you intend to use in your selectors before updating the configuration. Labels applied after updating your network connectivity check pod placement are ignored. 
+
+Refer to the default configuration in the following YAML: 
+
+**Default configuration for connectivity source and target pods**
+
+```yaml
+apiVersion: config.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  # ...
+    networkDiagnostics: 
+```
+
+
+1
+
+```yaml
+      mode: "All" 
+```
+
+
+2
+
+```yaml
+      sourcePlacement: 
+```
+
+
+3
+
+```yaml
+        nodeSelector:
+          checkNodes: groupA
+        tolerations:
+        - key: myTaint
+          effect: NoSchedule
+          operator: Exists
+      targetPlacement: 
+```
+
+
+4
+
+```yaml
+        nodeSelector:
+          checkNodes: groupB
+        tolerations:
+        - key: myOtherTaint
+          effect: NoExecute
+          operator: Exists
+```
+
+
+where: 
+
+`spec.networkDiagnostics`
+     Specifies the network diagnostics configuration. If a value is not specified or an empty object is specified, and `spec.disableNetworkDiagnostics=true` is set in the `network.operator.openshift.io` custom resource named `cluster`, network diagnostics are disabled. If set, this value overrides `spec.disableNetworkDiagnostics=true`. 
+`spec.networkDiagnostics.mode`
+     Specifies the diagnostics mode. The value can be the empty string, `All`, or `Disabled`. The empty string is equivalent to specifying `All`. 
+`spec.networkDiagnostics.sourcePlacement`
+     Optional: Specifies a selector for connectivity check source pods. You can use the `nodeSelector` and `tolerations` fields to further specify the `sourceNode` pods. These are optional for both source and target pods. You can omit them, use both, or use only one of them. 
+`spec.networkDiagnostics.targetPlacement`
+     Optional: Specifies a selector for connectivity check target pods. You can use the `nodeSelector` and `tolerations` fields to further specify the `targetNode` pods. These are optional for both source and target pods. You can omit them, use both, or use only one of them.

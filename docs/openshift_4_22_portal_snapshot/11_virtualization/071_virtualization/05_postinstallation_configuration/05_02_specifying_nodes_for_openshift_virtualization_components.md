@@ -1,0 +1,290 @@
+# 5.2. Specifying nodes for OpenShift Virtualization components
+
+You can configure node placement rules to specify where OpenShift Virtualization Operators, workloads, and controllers are deployed. Custom placement rules allow you to isolate virtual machine (VM) traffic or dedicate specialized compute resources to critical workloads. 
+
+Important
+
+You can configure node placement rules for some components after installing OpenShift Virtualization, but virtual machines cannot be present if you want to configure node placement rules for workloads. 
+
+## 5.2.1. About node placement rules for OpenShift Virtualization components
+
+You can use node placement rules to deploy virtual machines only on nodes intended for virtualization workloads, to deploy Operators only on infrastructure nodes, or to maintain separation between workloads. 
+
+Depending on the object, you can use one or more of the following rule types: 
+
+`nodeSelector`
+     Allows pods to be scheduled on nodes that are labeled with the key-value pair or pairs that you specify in this field. The node must have labels that exactly match all listed pairs. 
+`affinity`
+     Enables you to use more expressive syntax to set rules that match nodes with pods. Affinity also allows for more nuance in how the rules are applied. For example, you can specify that a rule is a preference, not a requirement. If a rule is a preference, pods are still scheduled when the rule is not satisfied. 
+`tolerations`
+     Allows pods to be scheduled on nodes that have matching taints. If a taint is applied to a node, that node only accepts pods that tolerate the taint. 
+
+If you are running an IBM Z or IBM LinuxONE (`s390x`) cluster with mixed hypervisors, refer to the following table for the supported nodes to run the virtual machines. 
+
+Table 5.1. IBM Z(R) node optionsNode architecture| Hypervisor| VM deployment| Node selection| VM architecture  
+---|---|---|---|---  
+s390x  |  LPAR  |  Supported  |  set node selector for LPAR node  |  s390x   
+s390x  |  z/VM  |  Unsupported  |  set anti-affinity for z/VM node  |  Not applicable   
+s390x  |  KVM  |  Unsupported  |  set anti-affinity for KVM node  |  Not applicable   
+Show more
+
+Note
+
+The scheduler does not select LPAR over z/VM or KVM nodes on `s390x` by default. To have a supported `s390x` virtual machine, you must set at least one `s390x` LPAR node as a schedulable compute node and you must set the node selector before deploying the virtual machine. 
+
+## 5.2.2. Apply node placement rules
+
+You can apply node placement rules to ensure that virtualization components run on the most suitable nodes for your workload requirements. You can apply node placement rules by editing OpenShift Virtualization objects. 
+
+**Prerequisites**
+
+  * You have installed the OpenShift CLI (`oc`). 
+  * You are logged in with cluster administrator permissions. 
+
+
+
+**Procedure**
+
+  1. Edit the object in your default editor by running the following command: 
+
+```shell-session
+$ oc edit <resource_type> <resource_name> -n openshift-cnv
+```
+
+
+  2. Save the file to apply the changes. 
+
+
+
+## 5.2.3. Node placement rule examples
+
+Examples of node placement rules for different objects that determine where OpenShift Virtualization components are deployed. 
+
+### 5.2.3.1. Subscription object node placement rule examples
+
+To specify the nodes where OLM deploys the OpenShift Virtualization Operators, edit the `Subscription` object during OpenShift Virtualization installation. 
+
+Note
+
+  * You cannot configure node placement rules for the `Subscription` object by using the web console. 
+  * The `Subscription` object does not support the `affinity` node placement rule. 
+
+
+
+**Example`Subscription` object with `nodeSelector` rule:**
+
+```yaml
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: hco-operatorhub
+  namespace: openshift-cnv
+spec:
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  name: kubevirt-hyperconverged
+  startingCSV: kubevirt-hyperconverged-operator.v4.22.9
+  channel: "stable"
+  config:
+    nodeSelector:
+      example.io/example-infra-key: example-infra-value
+```
+
+
+OLM deploys the OpenShift Virtualization Operators on nodes labeled `example.io/example-infra-key = example-infra-value`. 
+
+The following pods are affected by the `Subscription` object node placement rules. These pods are created when the OpenShift Virtualization Operator is first installed, even without an HyperConverged custom resource (CR): 
+
+  * `aaq-operator`
+  * `cdi-operator`
+  * `cluster-network-addons-operator`
+  * `hco-operator`
+  * `hco-webhook`
+  * `hostpath-provisioner-operator`
+  * `hyperconverged-cluster-cli-download`
+  * `kubevirt-migration-operator`
+  * `ssp-operator`
+  * `virt-operator`
+
+
+
+**Example`Subscription` object with `tolerations` rule:**
+
+```yaml
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: hco-operatorhub
+  namespace: openshift-cnv
+spec:
+  source:  redhat-operators
+  sourceNamespace: openshift-marketplace
+  name: kubevirt-hyperconverged
+  startingCSV: kubevirt-hyperconverged-operator.v4.22.9
+  channel: "stable"
+  config:
+    tolerations:
+    - key: "key"
+      operator: "Equal"
+      value: "virtualization"
+      effect: "NoSchedule"
+```
+
+
+OLM deploys OpenShift Virtualization Operators on nodes labeled `key = virtualization:NoSchedule` taint. Only pods with the matching tolerations are scheduled on these nodes. 
+
+### 5.2.3.2. HyperConverged object node placement rule example
+
+To specify the nodes where OpenShift Virtualization deploys its components, you can edit the `nodePlacement` object in the `HyperConverged` custom resource (CR) file that you create during OpenShift Virtualization installation. 
+
+**Example`HyperConverged` object with `nodeSelector` rule:**
+
+```yaml
+apiVersion: hco.kubevirt.io/v1
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+spec:
+  deployment:
+    nodePlacements:
+      infra:
+        nodeSelector:
+          example.io/example-infra-key: example-infra-value
+      workload:
+        nodeSelector:
+          example.io/example-workloads-key: example-workloads-value
+```
+
+
+  * Infrastructure resources are placed on nodes labeled `example.io/example-infra-key = example-infra-value`. 
+  * Workloads are placed on nodes labeled `example.io/example-workloads-key = example-workloads-value`. 
+
+
+
+**Example`HyperConverged` object with `affinity` rule:**
+
+```yaml
+apiVersion: hco.kubevirt.io/v1
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+spec:
+  deployment:
+    nodePlacements:
+      infra:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: example.io/example-infra-key
+                  operator: In
+                  values:
+                  - example-infra-value
+      workload:
+        affinity:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+              - matchExpressions:
+                - key: example.io/example-workloads-key
+                  operator: In
+                  values:
+                  - example-workloads-value
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              preference:
+                matchExpressions:
+                - key: example.io/num-cpus
+                  operator: Gt
+                  values:
+                  - 8
+```
+
+
+  * Infrastructure resources are placed on nodes labeled `example.io/example-infra-key = example-value`. 
+  * Workloads are placed on nodes labeled `example.io/example-workloads-key = example-workloads-value`. 
+  * Nodes that have more than eight CPUs are preferred for workloads, but if they are not available, pods are still scheduled. 
+
+
+
+**Example`HyperConverged` object with `tolerations` rule:**
+
+```yaml
+apiVersion: hco.kubevirt.io/v1
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+spec:
+  deployment:
+    nodePlacements:
+      workload:
+        tolerations:
+        - key: "key"
+          operator: "Equal"
+          value: "virtualization"
+          effect: "NoSchedule"
+```
+
+
+Nodes reserved for OpenShift Virtualization components are labeled with the `key = virtualization:NoSchedule` taint. Only pods with matching tolerations are scheduled on reserved nodes. 
+
+The following pods are affected by the `HyperConverged` object node placement rules. These pods are created when an HyperConverged CR is deployed: 
+
+  * `cdi-apiserver`
+  * `cdi-deployment`
+  * `cdi-uploadproxy`
+  * `kubemacpool-cert-manager`
+  * `kubemacpool-mac-controller-manager`
+  * `kubevirt-apiserver-proxy`
+  * `kubevirt-console-plugin`
+  * `kubevirt-ipam-controller-manager`
+  * `kubevirt-migration-controller`
+  * `virt-api`
+  * `virt-controller`
+  * `virt-exportproxy`
+  * `virt-template-validator`
+
+
+
+### 5.2.3.3. HostPathProvisioner object node placement rule example
+
+You can edit the `HostPathProvisioner` object directly or by using the web console. 
+
+Warning
+
+You must schedule the hostpath provisioner (HPP) and the OpenShift Virtualization components on the same nodes. Otherwise, virtualization pods that use the hostpath provisioner cannot run. You cannot run virtual machines. 
+
+After you deploy a virtual machine (VM) with the HPP storage class, you can remove the hostpath provisioner pod from the same node by using the node selector. However, you must first revert that change, at least for that specific node, and wait for the pod to run before trying to delete the VM. 
+
+You can configure node placement rules by specifying `nodeSelector`, `affinity`, or `tolerations` for the `spec.workload` field of the `HostPathProvisioner` object that you create when you install the hostpath provisioner. 
+
+**Example`HostPathProvisioner` object with `nodeSelector` rule:**
+
+```yaml
+apiVersion: hostpathprovisioner.kubevirt.io/v1beta1
+kind: HostPathProvisioner
+metadata:
+  name: hostpath-provisioner
+spec:
+  imagePullPolicy: IfNotPresent
+  pathConfig:
+    path: "</path/to/backing/directory>"
+    useNamingPrefix: false
+  workload:
+    nodeSelector:
+      example.io/example-workloads-key: example-workloads-value
+```
+
+
+Workloads are placed on nodes labeled `example.io/example-workloads-key = example-workloads-value`. 
+
+## 5.2.4. Additional resources
+
+  * [Specifying nodes for virtual machines](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/managing-vms#virt-specifying-nodes-for-vms "8.18.3. Specifying nodes for virtual machines")
+  * [Placing pods on specific nodes using node selectors](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/#nodes-scheduler-node-selectors)
+  * [Controlling pod placement on nodes using node affinity rules](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/#nodes-scheduler-node-affinity)
+  * [Controlling pod placement using node taints](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/#nodes-scheduler-taints-tolerations)

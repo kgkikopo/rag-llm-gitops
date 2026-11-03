@@ -1,0 +1,517 @@
+# 14.3. Troubleshooting
+
+To diagnose and resolve issues with virtual machine (VM) and cluster components, you can troubleshoot OpenShift Virtualization by using the web console or the OpenShift CLI (`oc`). These practices help ensure your virtualized infrastructure remains healthy. 
+
+## 14.3.1. View VM and resource events
+
+To monitor and troubleshoot virtual machine (VM), namespace, and resource issues, you can review OpenShift Container Platform events. Tracking this life-cycle information helps ensure you maintain a healthy cluster environment. 
+
+**Procedure**
+
+  * To view VM events, go to **VirtualMachine details** **Events** in the web console. 
+  * To view namespace events, run the following command: 
+
+```shell-session
+$ oc get events -n <namespace>
+```
+
+
+  * To view resource events, run the following command: 
+
+```shell-session
+$ oc describe <resource> <resource_name>
+```
+
+
+## 14.3.2. OpenShift Virtualization pod logs
+
+To diagnose issues and monitor OpenShift Virtualization pods, you can view logs by using the web console or the CLI. 
+
+Pod logs exist only while the pod exists. If a container restarts within a pod, you can still retrieve the logs of the earlier container, but the cluster discards the logs when it replaces the pod itself. For evidence that must survive pod replacement, or that spans several virtual machines (VMs) or nodes, use aggregated logs instead. 
+
+### 14.3.2.1. Configure OpenShift Virtualization pod log verbosity
+
+To gather more detailed diagnostic information for troubleshooting, you can configure the verbosity level of OpenShift Virtualization pod logs. Edit the `HyperConverged` custom resource (CR) to configure this setting. 
+
+**Prerequisites**
+
+  * You have installed the OpenShift CLI (`oc`). 
+
+
+
+**Procedure**
+
+  1. To set log verbosity for specific components, open the `HyperConverged` CR in your default text editor by running the following command: 
+
+```shell-session
+$ oc edit hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv
+```
+
+
+  2. Set the log level for one or more components by editing the `spec.logVerbosityConfig` stanza. For example: 
+
+```yaml
+apiVersion: hco.kubevirt.io/v1beta1
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+spec:
+  logVerbosityConfig:
+    kubevirt:
+      virtAPI: 5
+      virtController: 4
+      virtHandler: 3
+      virtLauncher: 2
+      virtOperator: 6
+```
+
+
+The log verbosity value must be an integer in the range `1–9`, where a higher number indicates a more detailed log. In this example, the `virtAPI` component logs are exposed if their priority level is `5` or higher. 
+
+  3. Apply your changes by saving and exiting the editor. 
+
+
+
+### 14.3.2.2. View virt-launcher pod logs with the web console
+
+To diagnose and troubleshoot virtual machine issues, you can view the `virt-launcher` pod logs by using the OpenShift Container Platform web console. 
+
+**Procedure**
+
+  1. Navigate to **Virtualization** **VirtualMachines**. 
+  2. Select a virtual machine to open the **VirtualMachine details** page. 
+  3. On the **General** tile, click the pod name to open the **Pod details** page. 
+  4. Click the **Logs** tab to view the logs. 
+
+
+
+### 14.3.2.3. View OpenShift Virtualization pod logs with the CLI
+
+To diagnose issues and monitor OpenShift Virtualization pods, you can view logs by using the OpenShift CLI (`oc`). 
+
+**Prerequisites**
+
+  * You have installed the OpenShift CLI (`oc`). 
+
+
+
+**Procedure**
+
+  1. View a list of pods in the OpenShift Virtualization namespace by running the following command: 
+
+```shell-session
+$ oc get pods -n openshift-cnv
+```
+
+
+Example output: 
+
+```shell-session
+NAME                               READY   STATUS    RESTARTS   AGE
+disks-images-provider-7gqbc        1/1     Running   0          32m
+disks-images-provider-vg4kx        1/1     Running   0          32m
+virt-api-57fcc4497b-7qfmc          1/1     Running   0          31m
+virt-api-57fcc4497b-tx9nc          1/1     Running   0          31m
+virt-controller-76c784655f-7fp6m   1/1     Running   0          30m
+virt-controller-76c784655f-f4pbd   1/1     Running   0          30m
+virt-handler-2m86x                 1/1     Running   0          30m
+virt-handler-9qs6z                 1/1     Running   0          30m
+virt-operator-7ccfdbf65f-q5snk     1/1     Running   0          32m
+virt-operator-7ccfdbf65f-vllz8     1/1     Running   0          32m
+```
+
+
+  2. View the pod log by running the following command: 
+
+```shell-session
+$ oc logs -n openshift-cnv <pod_name>
+```
+
+
+Note
+
+If a pod fails to start, you can use the `--previous` option to view logs from the last attempt. 
+
+To monitor log output in real time, use the `-f` option. 
+
+Example output: 
+
+```shell-session
+{"component":"virt-handler","level":"info","msg":"set verbosity to 2","pos":"virt-handler.go:453","timestamp":"2022-04-17T08:58:37.373695Z"}
+{"component":"virt-handler","level":"info","msg":"set verbosity to 2","pos":"virt-handler.go:453","timestamp":"2022-04-17T08:58:37.373726Z"}
+{"component":"virt-handler","level":"info","msg":"setting rate limiter to 5 QPS and 10 Burst","pos":"virt-handler.go:462","timestamp":"2022-04-17T08:58:37.373782Z"}
+{"component":"virt-handler","level":"info","msg":"CPU features of a minimum baseline CPU model: map[apic:true clflush:true cmov:true cx16:true cx8:true de:true fpu:true fxsr:true lahf_lm:true lm:true mca:true mce:true mmx:true msr:true mtrr:true nx:true pae:true pat:true pge:true pni:true pse:true pse36:true sep:true sse:true sse2:true sse4.1:true ssse3:true syscall:true tsc:true]","pos":"cpu_plugin.go:96","timestamp":"2022-04-17T08:58:37.390221Z"}
+{"component":"virt-handler","level":"warning","msg":"host model mode is expected to contain only one model","pos":"cpu_plugin.go:103","timestamp":"2022-04-17T08:58:37.390263Z"}
+{"component":"virt-handler","level":"info","msg":"node-labeller is running","pos":"node_labeller.go:94","timestamp":"2022-04-17T08:58:37.391011Z"}
+```
+
+
+## 14.3.3. Guest system logs
+
+To diagnose issues with virtual machine (VM) guests, you can configure access to and view their boot logs using the OpenShift Container Platform web console or the OpenShift CLI (`oc`). 
+
+If the guest VM has no network, you can access it using its VNC or serial console. 
+
+This feature is disabled by default. If a VM does not explicitly have this setting enabled or disabled, it inherits the cluster-wide default setting. 
+
+Important
+
+If sensitive information such as credentials or other personally identifiable information (PII) is written to the serial console, it is logged with all other visible text. Use SSH to send sensitive data. 
+
+### 14.3.3.1. Enable default access to guest system logs with the web console
+
+To troubleshoot issues more easily, you can enable default access to virtual machine (VM) guest system logs by using the web console. 
+
+**Procedure**
+
+  1. From the side menu, click **Virtualization** **Settings**. 
+  2. Click **Cluster** **Guest management**. 
+  3. Set **Enable guest system log access** to on. 
+  4. Optional: If you want to hide the VM user credentials that were set by using cloud-init, set **Hide guest credentials for non-privileged users** to on. 
+
+
+
+### 14.3.3.2. Enable default access to guest system logs with the CLI
+
+To troubleshoot issues more easily, you can enable default access to virtual machine (VM) guest system logs by editing the `HyperConverged` custom resource (CR). 
+
+**Prerequisites**
+
+  * You have installed the OpenShift CLI (`oc`). 
+
+
+
+**Procedure**
+
+  1. Open the `HyperConverged` CR in your default editor by running the following command: 
+
+```shell-session
+$ oc edit hyperconvergeds.v1beta1.hco.kubevirt.io kubevirt-hyperconverged -n openshift-cnv
+```
+
+
+  2. Update the `disableSerialConsoleLog` value. For example: 
+
+```yaml
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+spec:
+  virtualMachineOptions:
+    disableSerialConsoleLog: true
+#...
+```
+
+
+Set the value of `disableSerialConsoleLog` to `false` if you want serial console access to be enabled on VMs by default. 
+
+
+
+
+### 14.3.3.3. Set per-VM guest system log access with the web console
+
+To troubleshoot a specific virtual machine (VM) without changing global settings, you can configure the guest system log access by using the web console. 
+
+**Procedure**
+
+  1. Click **Virtualization** **VirtualMachines** from the side menu. 
+  2. Select a virtual machine to open the **VirtualMachine details** page. 
+  3. Click the **Configuration** tab. 
+  4. Set **Guest system log access** to on or off. 
+
+
+
+### 14.3.3.4. Set per-VM guest system log access with the CLI
+
+To troubleshoot a specific virtual machine (VM) without changing global settings, you can configure the guest system log access by editing the `VirtualMachine` CR. 
+
+**Prerequisites**
+
+  * You have installed the OpenShift CLI (`oc`). 
+
+
+
+**Procedure**
+
+  1. Edit the virtual machine manifest by running the following command: 
+
+```shell-session
+$ oc edit vm <vm_name>
+```
+
+
+  2. Update the value of the `logSerialConsole` field. For example: 
+
+```yaml
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: example-vm
+spec:
+  template:
+    spec:
+      domain:
+        devices:
+          logSerialConsole: true
+#...
+```
+
+
+To enable access to the guest serial console log, set the `logSerialConsole` value to `true`. 
+
+  3. Apply the new configuration to the VM by running the following command: 
+
+```shell-session
+$ oc apply vm <vm_name>
+```
+
+
+  4. Optional: If you edited a running VM, restart the VM to apply the new configuration. For example: 
+
+```shell-session
+$ virtctl restart <vm_name> -n <namespace>
+```
+
+
+### 14.3.3.5. View guest system logs with the web console
+
+To diagnose and troubleshoot issues with a virtual machine (VM) guest operating system, you can view the guest system logs by using the web console. 
+
+Guest system logs capture serial console output from the VM’s boot process, kernel messages, and system-level events, which is useful when troubleshooting boot failures, kernel panics, or configuration issues that prevent standard access methods. 
+
+**Prerequisites**
+
+  * Guest system log access is enabled. 
+
+
+
+**Procedure**
+
+  1. Click **Virtualization** **VirtualMachines** from the side menu. 
+  2. Select a virtual machine to open the **VirtualMachine details** page. 
+  3. Click the **Diagnostics** tab. 
+  4. Click **Guest system logs** to load the serial console. 
+
+
+
+### 14.3.3.6. View guest system logs with the CLI
+
+To diagnose and troubleshoot issues with a virtual machine (VM) guest operating system, you can view the guest system logs by running the `oc logs` command. 
+
+Guest system logs capture serial console output from the VM’s boot process, kernel messages, and system-level events, which is useful when troubleshooting boot failures, kernel panics, or configuration issues that prevent standard access methods. 
+
+**Prerequisites**
+
+  * Guest system log access is enabled. 
+  * You have installed the OpenShift CLI (`oc`). 
+
+
+
+**Procedure**
+
+  * View the logs by running the following command, substituting your own values for `<namespace>` and `<vm_name>`: 
+
+```shell-session
+$ oc logs -n <namespace> -l kubevirt.io/domain=<vm_name> --tail=-1 -c guest-console-log
+```
+
+
+## 14.3.4. Log aggregation with Loki
+
+To more easily diagnose and troubleshoot issues, you can aggregate and filter your logs. 
+
+### 14.3.4.1. View aggregated OpenShift Virtualization logs with Loki
+
+You can use the Loki logging component to view aggregated logs for OpenShift Virtualization pods and containers in the web console. This is useful for troubleshooting issues and monitoring your OpenShift Virtualization environment. 
+
+**Prerequisites**
+
+  * You have installed the Loki Operator and deployed the `LokiStack` custom resource (CR). 
+
+
+
+**Procedure**
+
+  1. Navigate to **Observe** **Logs** in the web console. 
+  2. Select **application** , for `virt-launcher` pod logs, or **infrastructure** , for OpenShift Virtualization control plane pods and containers, from the log type list. 
+  3. Click **Show Query** to display the query field. 
+  4. Enter the LogQL query in the query field and click **Run Query** to display the filtered logs. 
+
+
+
+### 14.3.4.2. OpenShift Virtualization LogQL queries
+
+To diagnose issues and monitor OpenShift Virtualization components, you can view and filter aggregated logs by running Loki Query Language (LogQL) queries on the **Observe** **Logs** page in the web console. 
+
+The default log type is _infrastructure_. The `virt-launcher` log type is _application_. 
+
+Optional: You can include or exclude strings or regular expressions by using line filter expressions. 
+
+Note
+
+If the query matches a large number of logs, the query might time out. 
+
+Table 14.3. OpenShift Virtualization LogQL example queriesComponent| LogQL query  
+---|---  
+All  |  `{log_type=~".+"}|json |kubernetes_labels_app_kubernetes_io_part_of="hyperconverged-cluster"`  
+`cdi-apiserver` `cdi-deployment` `cdi-operator` |  `{log_type=~".+"}|json |kubernetes_labels_app_kubernetes_io_part_of="hyperconverged-cluster" |kubernetes_labels_app_kubernetes_io_component="storage"`  
+`hco-operator` |  `{log_type=~".+"}|json |kubernetes_labels_app_kubernetes_io_part_of="hyperconverged-cluster" |kubernetes_labels_app_kubernetes_io_component="deployment"`  
+`kubemacpool` |  `{log_type=~".+"}|json |kubernetes_labels_app_kubernetes_io_part_of="hyperconverged-cluster" |kubernetes_labels_app_kubernetes_io_component="network"`  
+`virt-api` `virt-controller` `virt-handler` `virt-operator` |  `{log_type=~".+"}|json |kubernetes_labels_app_kubernetes_io_part_of="hyperconverged-cluster" |kubernetes_labels_app_kubernetes_io_component="compute"`  
+`ssp-operator` |  `{log_type=~".+"}|json |kubernetes_labels_app_kubernetes_io_part_of="hyperconverged-cluster" |kubernetes_labels_app_kubernetes_io_component="schedule"`  
+Container  |  `{log_type=~".+",kubernetes_container_name=~"<container>|<container>"} |json|kubernetes_labels_app_kubernetes_io_part_of="hyperconverged-cluster"` Specify one or more containers separated by a pipe (`|`).   
+`virt-launcher` |  You must select **application** from the log type list before running this query.  `{log_type=~".+", kubernetes_container_name="compute"}|json |!= "custom-ga-command"` `|!= "custom-ga-command"` excludes libvirt logs that contain the string `custom-ga-command`. ([**BZ#2177684**](https://bugzilla.redhat.com/show_bug.cgi?id=2177684))   
+Show more
+
+You can filter log lines to include or exclude strings or regular expressions by using line filter expressions. 
+
+Table 14.4. Line filter expressionsLine filter expression| Description  
+---|---  
+`|= "<string>"` |  Log line contains string   
+`!= "<string>"` |  Log line does not contain string   
+`|~ "<regex>"` |  Log line contains regular expression   
+`!~ "<regex>"` |  Log line does not contain regular expression   
+Show more
+
+**Example 14.1. Example line filter expression**
+
+```plaintext
+{log_type=~".+"}|json
+|kubernetes_labels_app_kubernetes_io_part_of="hyperconverged-cluster"
+|= "error" != "timeout"
+```
+
+
+### 14.3.4.3. Common error messages
+
+Troubleshoot OpenShift Virtualization by reviewing common error messages found in the logs. 
+
+`ErrImagePull` or `ImagePullBackOff`
+     Indicates an incorrect deployment configuration or problems with the images that are referenced. 
+
+## 14.3.5. Data volume troubleshooting
+
+To analyze and resolve issues, you can check the `Conditions` and `Events` sections of the `DataVolume` object. 
+
+### 14.3.5.1. Data volume conditions and events
+
+To diagnose data volume issues, you can examine the `Conditions` and `Events` sections of the `oc describe` command output. 
+
+Run the following command to inspect the data volume: 
+
+```shell-session
+$ oc describe dv <DataVolume>
+```
+
+
+The `Conditions` section displays the following `Types`: 
+
+  * `Bound`
+  * `Running`
+  * `Ready`
+
+
+
+The `Events` section provides the following additional information: 
+
+  * `Type` of event 
+  * `Reason` for logging 
+  * `Source` of the event 
+  * `Message` containing additional diagnostic information. 
+
+
+
+The output from `oc describe` does not always contains `Events`. 
+
+An event is generated when the `Status`, `Reason`, or `Message` changes. Both conditions and events react to changes in the state of the data volume. 
+
+For example, if you misspell the URL during an import operation, the import generates a 404 message. That message change generates an event with a reason. The output in the `Conditions` section is updated as well. 
+
+### 14.3.5.2. Data volume condition and event analysis
+
+To determine the state of a data volume in relation to a Persistent Volume Claim (PVC) and whether or not an operation is actively running on the data volume, inspect the `Conditions` and `Events` section of the `oc describe` command output. 
+
+You might also receive messages that offer specific details about the status of the data volume, and how it came to be in its current state. 
+
+There are many different combinations of conditions. Each must be evaluated in its unique context. 
+
+Examples of various combinations follow. 
+
+  * `Bound` \- A successfully bound PVC displays in this example. 
+
+Note that the `Type` is `Bound`, so the `Status` is `True`. If the PVC is not bound, the `Status` is `False`. 
+
+When the PVC is bound, an event is generated stating that the PVC is bound. In this case, the `Reason` is `Bound` and `Status` is `True`. The `Message` indicates which PVC owns the data volume. 
+
+`Message`, in the `Events` section, provides further details including how long the PVC has been bound (`Age`) and by what resource (`From`), in this case `datavolume-controller`. 
+
+Example output: 
+
+```shell-session
+Status:
+  Conditions:
+    Last Heart Beat Time:  2020-07-15T03:58:24Z
+    Last Transition Time:  2020-07-15T03:58:24Z
+    Message:               PVC win10-rootdisk Bound
+    Reason:                Bound
+    Status:                True
+    Type:                  Bound
+...
+  Events:
+    Type     Reason     Age    From                   Message
+    ----     ------     ----   ----                   -------
+    Normal   Bound      24s    datavolume-controller  PVC example-dv Bound
+```
+
+
+  * `Running` \- In this case, note that `Type` is `Running` and `Status` is `False`, indicating that an event has occurred that caused an attempted operation to fail, changing the Status from `True` to `False`. 
+
+However, note that `Reason` is `Completed` and the `Message` field indicates `Import Complete`. 
+
+In the `Events` section, the `Reason` and `Message` contain additional troubleshooting information about the failed operation. In this example, the `Message` displays an inability to connect due to a `404`, listed in the `Events` section’s first `Warning`. 
+
+From this information, you conclude that an import operation was running, creating contention for other operations that are attempting to access the data volume. 
+
+Example output: 
+
+```shell-session
+Status:
+  Conditions:
+    Last Heart Beat Time:  2020-07-15T04:31:39Z
+    Last Transition Time:  2020-07-15T04:31:39Z
+    Message:               Import Complete
+    Reason:                Completed
+    Status:                False
+    Type:                  Running
+...
+  Events:
+    Type     Reason       Age                From                   Message
+    ----     ------       ----               ----                   -------
+    Warning  Error        12s (x2 over 14s)  datavolume-controller  Unable to connect
+    to http data source: expected status code 200, got 404. Status: 404 Not Found
+```
+
+
+  * `Ready` – If `Type` is `Ready` and `Status` is `True`, then the data volume is ready to be used, as in the following example. If the data volume is not ready to be used, the `Status` is `False`. 
+
+Example output: 
+
+```shell-session
+Status:
+  Conditions:
+    Last Heart Beat Time: 2020-07-15T04:31:39Z
+    Last Transition Time:  2020-07-15T04:31:39Z
+    Status:                True
+    Type:                  Ready
+```
+
+
+## 14.3.6. Additional resources
+
+  * [OpenShift Container Platform events](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/#nodes-containers-events)
+  * [List of events](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/#nodes-containers-events-list_nodes-containers-events)
+  * [View aggregated OpenShift Virtualization logs with Loki](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/support#virt-viewing-logs-loki_virt-troubleshooting "14.3.4.1. View aggregated OpenShift Virtualization logs with Loki")
+  * [Connecting to virtual machine consoles](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/managing-vms#virt-accessing-vm-consoles "8.5. Connect to a virtual machine console")
+  * [List of known Windows BSOD issues on OpenShift Virtualization and RHEL KVM](https://access.redhat.com/articles/7141237)
+  * [Recommendations when investigating Windows BSOD issues](https://access.redhat.com/articles/7129390)
+  * [LogQL log queries](https://grafana.com/docs/loki/latest/logql/log_queries/)

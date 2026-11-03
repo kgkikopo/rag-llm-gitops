@@ -1,0 +1,589 @@
+# 2.4. Scaling a user-provisioned cluster with the Bare Metal Operator
+
+After deploying a user-provisioned infrastructure cluster, you can use the Bare Metal Operator (BMO) and other metal3 components to scale bare-metal hosts in the cluster. This approach helps you to scale a user-provisioned cluster in a more automated way. 
+
+## 2.4.1. About scaling a user-provisioned cluster with the Bare Metal Operator
+
+You can scale user-provisioned infrastructure clusters by using the Bare Metal Operator (BMO) and other metal3 components. 
+
+User-provisioned infrastructure installations do not feature the Machine API Operator. The Machine API Operator typically manages the lifecycle of bare-metal nodes in a cluster. However, it is possible to use the BMO and other metal3 components to scale nodes in user-provisioned clusters without requiring the Machine API Operator. 
+
+### 2.4.1.1. Prerequisites for scaling a user-provisioned cluster
+
+The following prerequisites must be met before scaling a user-provisioned cluster. 
+
+  * You installed a user-provisioned infrastructure cluster on bare metal. 
+  * You have baseboard management controller (BMC) access to the hosts. 
+
+
+
+### 2.4.1.2. Limitations for scaling a user-provisioned cluster
+
+The following limitations apply to scaling a user-provisioned cluster. 
+
+  * You cannot use a provisioning network to scale user-provisioned infrastructure clusters by using the Bare Metal Operator (BMO). 
+
+    * Consequentially, you can only use bare-metal host drivers that support virtual media networking booting, for example `redfish-virtualmedia` and `idrac-virtualmedia`. 
+
+  * You cannot scale `MachineSet` objects in user-provisioned infrastructure clusters by using the BMO. 
+
+
+
+## 2.4.2. Configuring a provisioning resource to scale user-provisioned clusters
+
+Create a `Provisioning` custom resource (CR) to enable Metal platform components on a user-provisioned infrastructure cluster. 
+
+**Prerequisites**
+
+  * You installed a user-provisioned infrastructure cluster on bare metal. 
+
+
+
+**Procedure**
+
+  1. Create a `Provisioning` CR. 
+
+     1. Save the following YAML in the `provisioning.yaml` file: 
+
+```yaml
+apiVersion: metal3.io/v1alpha1
+kind: Provisioning
+metadata:
+  name: provisioning-configuration
+spec:
+  provisioningNetwork: "Disabled"
+  watchAllNamespaces: false
+```
+
+
+Note
+
+OpenShift Container Platform 4.22 does not support enabling a provisioning network when you scale a user-provisioned cluster by using the Bare Metal Operator. 
+
+  2. Create the `Provisioning` CR by running the following command: 
+
+```shell-session
+$ oc create -f provisioning.yaml
+```
+
+
+**Example output**
+
+```shell-session
+provisioning.metal3.io/provisioning-configuration created
+```
+
+
+**Verification**
+
+  * Verify that the provisioning service is running by running the following command: 
+
+```shell-session
+$ oc get pods -n openshift-machine-api
+```
+
+
+**Example output**
+
+```shell-session
+NAME                                                  READY   STATUS    RESTARTS        AGE
+cluster-autoscaler-operator-678c476f4c-jjdn5          2/2     Running   0               5d21h
+cluster-baremetal-operator-6866f7b976-gmvgh           2/2     Running   0               5d21h
+control-plane-machine-set-operator-7d8566696c-bh4jz   1/1     Running   0               5d21h
+ironic-proxy-64bdw                                    1/1     Running   0               5d21h
+ironic-proxy-rbggf                                    1/1     Running   0               5d21h
+ironic-proxy-vj54c                                    1/1     Running   0               5d21h
+machine-api-controllers-544d6849d5-tgj9l              7/7     Running   1 (5d21h ago)   5d21h
+machine-api-operator-5c4ff4b86d-6fjmq                 2/2     Running   0               5d21h
+metal3-6d98f84cc8-zn2mx                               5/5     Running   0               5d21h
+metal3-image-customization-59d745768d-bhrp7           1/1     Running   0               5d21h
+```
+
+
+## 2.4.3. Provisioning new hosts in a user-provisioned cluster by using the BMO
+
+You can use the Bare Metal Operator (BMO) to provision bare-metal hosts in a user-provisioned cluster by creating a `BareMetalHost` custom resource (CR). 
+
+Note
+
+Provisioning bare-metal hosts to the cluster by using the BMO sets the `spec.externallyProvisioned` specification in the `BareMetalHost` custom resource to `false` by default. Do not set the `spec.externallyProvisioned` specification to `true`, because this setting results in unexpected behavior. 
+
+**Prerequisites**
+
+  * You created a user-provisioned bare-metal cluster. 
+  * You have baseboard management controller (BMC) access to the hosts. 
+  * You deployed a provisioning service in the cluster by creating a `Provisioning` CR. 
+
+
+
+**Procedure**
+
+  1. Create a configuration file for the bare-metal node. Depending if you use either a static configuration or a DHCP server, choose one of the following example `bmh.yaml` files and configure it to your needs by replacing values in the YAML to match your environment: 
+
+     * To deploy with a static configuration, create the following `bmh.yaml` file: 
+
+```yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openshift-worker-<num>-network-config-secret
+  namespace: openshift-machine-api
+type: Opaque
+stringData:
+  nmstate: |
+    interfaces:
+    - name: <nic1_name>
+      type: ethernet
+      state: up
+      ipv4:
+        address:
+        - ip: <ip_address>
+          prefix-length: 24
+        enabled: true
+    dns-resolver:
+      config:
+        server:
+        - <dns_ip_address>
+    routes:
+      config:
+      - destination: 0.0.0.0/0
+        next-hop-address: <next_hop_ip_address>
+        next-hop-interface: <next_hop_nic1_name>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openshift-worker-<num>-bmc-secret
+  namespace: openshift-machine-api
+type: Opaque
+data:
+  username: <base64_of_uid>
+  password: <base64_of_pwd>
+---
+apiVersion: metal3.io/v1alpha1
+kind: BareMetalHost
+metadata:
+  name: openshift-worker-<num>
+  namespace: openshift-machine-api
+spec:
+  online: true
+  bootMACAddress: <nic1_mac_address>
+  bmc:
+    address: <protocol>://<bmc_url>
+    credentialsName: openshift-worker-<num>-bmc-secret
+    disableCertificateVerification: false
+  customDeploy:
+    method: install_coreos
+  userData:
+    name: worker-user-data-managed
+    namespace: openshift-machine-api
+  rootDeviceHints:
+    deviceName: <root_device_hint>
+  preprovisioningNetworkDataName: openshift-worker-<num>-network-config-secret
+```
+
+
+where: 
+
+`metadata.name`
+     Specifies the unique compute node number. Replace all instances of `<num>` with a unique compute node number for the bare-metal nodes in the `name`, `credentialsName`, and `preprovisioningNetworkDataName` fields. 
+`stringData.nmstate`
+     Specifies the NMState YAML syntax to configure the host interfaces. To configure the network interface for a newly created node, specify the name of the secret that has the network configuration. Follow the `nmstate` syntax to define the network configuration for your node. See "Preparing the bare-metal node" for details on configuring NMState syntax. 
+`stringData.nmstate.interfaces`
+     Specifies the network interfaces. If you have configured the network interface with `nmstate`, and you want to disable an interface, set `state: up` with the IP addresses set to `enabled: false`. This field is optional. 
+`stringData.nmstate.interfaces[].name`
+     Specifies the name of the bare-metal node’s first network interface controller (NIC). Replace `<nic1_name>` with the NIC name. 
+`stringData.nmstate.interfaces[].ipv4.address[].ip`
+     Specifies the IP address of the bare-metal node’s NIC. Replace `<ip_address>` with the IP address. 
+`stringData.nmstate.dns-resolver.config.server[]`
+     Specifies the IP address of the bare-metal node’s DNS resolver. Replace `<dns_ip_address>` with the DNS server IP address. 
+`stringData.nmstate.routes.config[].next-hop-address`
+     Specifies the IP address of the bare-metal node’s external gateway. Replace `<next_hop_ip_address>` with the gateway IP address. 
+`stringData.nmstate.routes.config[].next-hop-interface`
+     Specifies the name of the bare-metal node’s external gateway interface. Replace `<next_hop_nic1_name>` with the interface name. 
+`data.username`
+     Specifies the base64-encoded credentials for the BMC Secret. Replace `<base64_of_uid>` and `<base64_of_pwd>` with the base64 string of the user name and password. 
+`spec.bootMACAddress`
+     Specifies the MAC address of the bare-metal node’s first NIC. See the "BMC addressing" section for additional BMC configuration options. 
+`spec.bmc.address`
+     Specifies the BMC address. Replace `<protocol>` with the BMC protocol, such as IPMI, Redfish, or others. Replace `<bmc_url>` with the URL of the bare-metal node’s baseboard management controller. 
+`spec.rootDeviceHints.deviceName`
+     Specifies the root device hint path. Replace `<root_device_hint>` with a device path when specifying a root device hint. See "Root device hints" for additional details. This field is optional. 
+
+     * When configuring the network interface with a static configuration by using `nmstate`, set `state: up` with the IP addresses set to `enabled: false`: 
+
+```yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openshift-worker-<num>-network-config-secret
+  namespace: openshift-machine-api
+ # ...
+interfaces:
+  - name: <nic_name>
+    type: ethernet
+    state: up
+    ipv4:
+      enabled: false
+    ipv6:
+      enabled: false
+# ...
+```
+
+
+     * To deploy with a DHCP configuration, create the following `bmh.yaml` file: 
+
+```yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openshift-worker-<num>-bmc-secret
+  namespace: openshift-machine-api
+type: Opaque
+data:
+  username: <base64_of_uid>
+  password: <base64_of_pwd>
+---
+apiVersion: metal3.io/v1alpha1
+kind: BareMetalHost
+metadata:
+  name: openshift-worker-<num>
+  namespace: openshift-machine-api
+spec:
+  online: true
+  bootMACAddress: <nic1_mac_address>
+  bmc:
+    address: <protocol>://<bmc_url>
+    credentialsName: openshift-worker-<num>-bmc
+    disableCertificateVerification: false
+  customDeploy:
+    method: install_coreos
+  userData:
+    name: worker-user-data-managed
+    namespace: openshift-machine-api
+  rootDeviceHints:
+    deviceName: <root_device_hint>
+```
+
+
+where: 
+
+`metadata.name`
+     Specifies the BMC Secret name. Replace `<num>` with a unique compute node number for the bare-metal nodes in the `name` and `credentialsName` fields. 
+`data.username`
+     Specifies the base64-encoded credentials. Replace `<base64_of_uid>` and `<base64_of_pwd>` with the base64 string of the user name and password. 
+`spec.bootMACAddress`
+     Specifies the MAC address of the bare-metal node’s first NIC. See the "BMC addressing" section for additional BMC configuration options. 
+`spec.bmc.address`
+     Specifies the BMC address. Replace `<protocol>` with the BMC protocol, such as IPMI, Redfish, or others. Replace `<bmc_url>` with the URL of the bare-metal node’s baseboard management controller. 
+`spec.rootDeviceHints.deviceName`
+    
+
+Specifies the root device hint path. Replace `<root_device_hint>` with a device path when specifying a root device hint. See "Root device hints" for additional details. This field is optional. 
+
+Important
+
+If the MAC address of an existing bare-metal node matches the MAC address of the bare-metal host that you are attempting to provision, then the installation will fail. If the host enrollment, inspection, cleaning, or other steps fail, the Bare Metal Operator retries the installation continuously. See "Diagnosing a duplicate MAC address when provisioning a new host in the cluster" for additional details. 
+
+  2. Create the bare-metal node by running the following command: 
+
+```shell-session
+$ oc create -f bmh.yaml
+```
+
+
+**Example output**
+
+```shell-session
+secret/openshift-worker-<num>-network-config-secret created
+secret/openshift-worker-<num>-bmc-secret created
+baremetalhost.metal3.io/openshift-worker-<num> created
+```
+
+
+  3. Inspect the bare-metal node by running the following command: 
+
+```shell-session
+$ oc -n openshift-machine-api get bmh openshift-worker-<num>
+```
+
+
+where: 
+
+<num>
+    
+
+Specifies the compute node number. 
+
+**Example output**
+
+```shell-session
+NAME                    STATE       CONSUMER   ONLINE   ERROR
+openshift-worker-<num>  provisioned true
+```
+
+
+  4. Approve all certificate signing requests (CSRs). 
+
+     1. Get the list of pending CSRs by running the following command: 
+
+```shell-session
+$ oc get csr
+```
+
+
+**Example output**
+
+```shell-session
+NAME        AGE   SIGNERNAME                                    REQUESTOR                                         REQUESTEDDURATION CONDITION
+csr-gfm9f   33s   kubernetes.io/kube-apiserver-client-kubelet   system:serviceaccount:openshift-machine-config-o
+perator:node-bootstrapper   <none>              Pending
+```
+
+
+     2. Approve the CSR by running the following command: 
+
+```shell-session
+$ oc adm certificate approve <csr_name>
+```
+
+
+**Example output**
+
+```shell-session
+certificatesigningrequest.certificates.k8s.io/<csr_name> approved
+```
+
+
+**Verification**
+
+  * Verify that the node is ready by running the following command: 
+
+```shell-session
+$ oc get nodes
+```
+
+
+**Example output**
+
+```shell-session
+NAME        STATUS   ROLES           AGE     VERSION
+app1        Ready    worker          47s     v1.24.0+dc5a2fd
+controller1 Ready    master,worker   2d22h   v1.24.0+dc5a2fd
+```
+
+
+**Additional resources**
+
+  * [Preparing the bare-metal node](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_bare_metal/bare-metal-expanding-the-cluster#preparing-the-bare-metal-node_bare-metal-expanding "5.1. Preparing the bare-metal node")
+  * [Root device hints](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_bare_metal/installer-provisioned-infrastructure#root-device-hints_ipi-install-installation-workflow "3.3.15.8. Root device hints")
+  * [Diagnosing a duplicate MAC address when provisioning a new host in the cluster](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/installing_on_bare_metal/bare-metal-expanding-the-cluster#ipi-install-diagnosing-duplicate-mac-address_bare-metal-expanding "5.4. Diagnosing a duplicate MAC address when provisioning a new host in the cluster")
+
+
+
+## 2.4.4. Optional: Managing existing hosts in a user-provisioned cluster by using the BMO
+
+Optionally, you can use the Bare Metal Operator (BMO) to manage existing bare-metal controller hosts in a user-provisioned cluster by creating a `BareMetalHost` object for the existing host. 
+
+It is not a requirement to manage existing user-provisioned hosts; however, you can enroll them as externally-provisioned hosts for inventory purposes. 
+
+Important
+
+To manage existing hosts by using the BMO, you must set the `spec.externallyProvisioned` specification in the `BareMetalHost` custom resource to `true` to prevent the BMO from re-provisioning the host. 
+
+**Prerequisites**
+
+  * You created a user-provisioned bare-metal cluster. 
+  * You have baseboard management controller (BMC) access to the hosts. 
+  * You deployed a provisioning service in the cluster by creating a `Provisioning` CR. 
+
+
+
+**Procedure**
+
+  1. Create the `Secret` CR and the `BareMetalHost` CR. 
+
+     1. Save the following YAML in the `controller.yaml` file: 
+
+```yaml
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: controller1-bmc
+  namespace: openshift-machine-api
+type: Opaque
+data:
+  username: <base64_of_uid>
+  password: <base64_of_pwd>
+---
+apiVersion: metal3.io/v1alpha1
+kind: BareMetalHost
+metadata:
+  name: controller1
+  namespace: openshift-machine-api
+spec:
+  bmc:
+    address: <protocol>://<bmc_url>
+    credentialsName: "controller1-bmc"
+  bootMACAddress: <nic1_mac_address>
+  customDeploy:
+    method: install_coreos
+  externallyProvisioned: true
+  online: true
+  userData:
+    name: controller-user-data-managed
+    namespace: openshift-machine-api
+```
+
+
+where: 
+
+`spec.bmc.address`
+     Specifies the BMC address. Only bare-metal host drivers that support virtual media networking booting are supported, for example `redfish-virtualmedia` and `idrac-virtualmedia`. 
+`spec.externallyProvisioned`
+     Specifies whether the host is externally provisioned. You must set this value to `true` to prevent the BMO from re-provisioning the bare-metal controller host. 
+
+  2. Create the bare-metal host object by running the following command: 
+
+```shell-session
+$ oc create -f controller.yaml
+```
+
+
+**Example output**
+
+```shell-session
+secret/controller1-bmc created
+baremetalhost.metal3.io/controller1 created
+```
+
+
+**Verification**
+
+  * Verify that the BMO created the bare-metal host object by running the following command: 
+
+```shell-session
+$ oc get bmh -A
+```
+
+
+**Example output**
+
+```shell-session
+NAMESPACE               NAME          STATE                    CONSUMER   ONLINE   ERROR   AGE
+openshift-machine-api   controller1   externally provisioned              true             13s
+```
+
+
+## 2.4.5. Removing hosts from a user-provisioned cluster by using the BMO
+
+You can use the Bare Metal Operator (BMO) to remove bare-metal hosts from a user-provisioned cluster. 
+
+**Prerequisites**
+
+  * You created a user-provisioned bare-metal cluster. 
+  * You have baseboard management controller (BMC) access to the hosts. 
+  * You deployed a provisioning service in the cluster by creating a `Provisioning` CR. 
+
+
+
+**Procedure**
+
+  1. Cordon and drain the node by running the following command: 
+
+```shell-session
+$ oc adm drain app1 --force --ignore-daemonsets=true
+```
+
+
+**Example output**
+
+```shell-session
+node/app1 cordoned
+WARNING: ignoring DaemonSet-managed Pods: openshift-cluster-node-tuning-operator/tuned-tvthg, openshift-dns/dns-
+default-9q6rz, openshift-dns/node-resolver-zvt42, openshift-image-registry/node-ca-mzxth, openshift-ingress-cana
+ry/ingress-canary-qq5lf, openshift-machine-config-operator/machine-config-daemon-v79dm, openshift-monitoring/nod
+e-exporter-2vn59, openshift-multus/multus-additional-cni-plugins-wssvj, openshift-multus/multus-fn8tg, openshift
+-multus/network-metrics-daemon-5qv55, openshift-network-diagnostics/network-check-target-jqxn2, openshift-ovn-ku
+bernetes/ovnkube-node-rsvqg
+evicting pod openshift-operator-lifecycle-manager/collect-profiles-27766965-258vp
+evicting pod openshift-operator-lifecycle-manager/collect-profiles-27766950-kg5mk
+evicting pod openshift-operator-lifecycle-manager/collect-profiles-27766935-stf4s
+pod/collect-profiles-27766965-258vp evicted
+pod/collect-profiles-27766950-kg5mk evicted
+pod/collect-profiles-27766935-stf4s evicted
+node/app1 drained
+```
+
+
+  2. Delete the `customDeploy` specification from the `BareMetalHost` CR. 
+
+     1. Edit the `BareMetalHost` CR for the host by running the following command: 
+
+```shell-session
+$ oc edit bmh -n openshift-machine-api <host_name>
+```
+
+
+     2. Delete the lines `spec.customDeploy` and `spec.customDeploy.method`: 
+
+```yaml
+...
+  customDeploy:
+    method: install_coreos
+```
+
+
+     3. Verify that the provisioning state of the host changes to `deprovisioning` by running the following command: 
+
+```shell-session
+$ oc get bmh -A
+```
+
+
+**Example output**
+
+```shell-session
+NAMESPACE               NAME          STATE                    CONSUMER   ONLINE   ERROR   AGE
+openshift-machine-api   controller1   externally provisioned              true             58m
+openshift-machine-api   worker1       deprovisioning                      true             57m
+```
+
+
+  3. Delete the host by running the following command when the `BareMetalHost` state changes to `available`: 
+
+```shell-session
+$ oc delete bmh -n openshift-machine-api <bmh_name>
+```
+
+
+Note
+
+You can run this step without having to edit the `BareMetalHost` CR. It might take some time for the `BareMetalHost` state to change from `deprovisioning` to `available`. 
+
+  4. Delete the node by running the following command: 
+
+```shell-session
+$ oc delete node <node_name>
+```
+
+
+**Verification**
+
+  * Verify that you deleted the node by running the following command: 
+
+```shell-session
+$ oc get nodes
+```
+
+
+**Example output**
+
+```shell-session
+NAME          STATUS   ROLES           AGE     VERSION
+controller1   Ready    master,worker   2d23h   v1.24.0+dc5a2fd
+```

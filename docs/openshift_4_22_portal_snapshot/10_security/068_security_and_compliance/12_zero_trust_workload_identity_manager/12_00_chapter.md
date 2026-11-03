@@ -1,0 +1,17 @@
+# Chapter 12. Zero Trust Workload Identity Manager
+
+- [12.1. Zero Trust Workload Identity Manager overview](12_01_zero_trust_workload_identity_manager_overview.md)
+- [12.2. Zero Trust Workload Identity Manager components](12_02_zero_trust_workload_identity_manager_components.md)
+- [12.3. Zero Trust Workload Identity Manager release notes](12_03_zero_trust_workload_identity_manager_release_notes.md)
+- [12.4. Installing the Zero Trust Workload Identity Manager](12_04_installing_the_zero_trust_workload_identity_manager.md)
+- [12.5. Deploying Zero Trust Workload Identity Manager operands](12_05_deploying_zero_trust_workload_identity_manager_operands.md)
+- [12.6. Configuring the egress proxy for the Zero Trust Workload Identity Manager](12_06_configuring_the_egress_proxy_for_the_zero_trust_workload_identity_manager.md)
+- [12.7. Zero Trust Workload Identity Manager OIDC federation](12_07_zero_trust_workload_identity_manager_oidc_federation.md)
+- [12.8. Zero Trust Workload Identity Manager SPIRE federation](12_08_zero_trust_workload_identity_manager_spire_federation.md)
+- [12.9. Using the SPIFFE Helper container image](12_09_using_the_spiffe_helper_container_image.md)
+- [12.10. Integrating Red Hat OpenShift Service Mesh with Zero Trust Workload Identity Manager in a single-cluster](12_10_integrating_red_hat_openshift_service_mesh_with_zero_trust_workload_identity_manager_in_a_single_cluster.md)
+- [12.11. Integrating SPIRE federation with multi-cluster Red Hat OpenShift Service Mesh](12_11_integrating_spire_federation_with_multi_cluster_red_hat_openshift_service_mesh.md)
+- [12.12. Enabling create-only mode for the Zero Trust Workload Identity Manager](12_12_enabling_create_only_mode_for_the_zero_trust_workload_identity_manager.md)
+- [12.13. SPIRE UpstreamAuthority plugins for Zero Trust Workload Identity Manager](12_13_spire_upstreamauthority_plugins_for_zero_trust_workload_identity_manager.md)
+- [12.14. Monitoring Zero Trust Workload Identity Managergit](12_14_monitoring_zero_trust_workload_identity_managergit.md)
+- [12.15. Uninstalling the Zero Trust Workload Identity Manager](12_15_uninstalling_the_zero_trust_workload_identity_manager.md)

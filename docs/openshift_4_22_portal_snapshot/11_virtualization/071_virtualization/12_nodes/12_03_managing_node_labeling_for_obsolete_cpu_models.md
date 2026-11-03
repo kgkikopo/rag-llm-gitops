@@ -1,0 +1,56 @@
+# 12.3. Managing node labeling for obsolete CPU models
+
+You can schedule a virtual machine (VM) on a node if the VM CPU model and policy are supported by the node. 
+
+## 12.3.1. Node labeling for obsolete CPU models
+
+The OpenShift Virtualization Operator uses a predefined list of obsolete CPU models to ensure that a node supports only valid CPU models for scheduled VMs. 
+
+By default, the following CPU models are eliminated from the list of labels generated for the node: 
+
+**Example 12.1. Obsolete CPU models**
+
+```plaintext
+"486"
+Conroe
+athlon
+core2duo
+coreduo
+kvm32
+kvm64
+n270
+pentium
+pentium2
+pentium3
+pentiumpro
+phenom
+qemu32
+qemu64
+```
+
+
+This predefined list is not visible in the `HyperConverged` CR. You cannot _remove_ CPU models from this list, but you can add to the list by editing the `spec.obsoleteCPUs.cpuModels` field of the `HyperConverged` CR. 
+
+## 12.3.2. Configure obsolete CPU models
+
+You can configure a list of obsolete CPU models by editing the `HyperConverged` custom resource (CR). 
+
+**Procedure**
+
+  * Edit the `HyperConverged` custom resource, specifying the obsolete CPU models in the `obsoleteCPUs` array. For example: 
+
+```yaml
+apiVersion: hco.kubevirt.io/v1beta1
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+spec:
+  obsoleteCPUs:
+    cpuModels:
+      - "<obsolete_cpu_1>"
+      - "<obsolete_cpu_2>"
+```
+
+
+Replace the example values in the `cpuModels` array with obsolete CPU models. Any value that you specify is added to a predefined list of obsolete CPU models. The predefined list is not visible in the CR.

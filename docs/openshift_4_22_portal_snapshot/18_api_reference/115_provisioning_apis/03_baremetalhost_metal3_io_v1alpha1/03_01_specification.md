@@ -1,0 +1,719 @@
+# 3.1. Specification
+
+Property| Type| Description  
+---|---|---  
+`apiVersion` |  `string` |  APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: <https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources>  
+`kind` |  `string` |  Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: <https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds>  
+`metadata` |  [`ObjectMeta`](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/common_object_reference/#io-k8s-apimachinery-pkg-apis-meta-v1-ObjectMeta) |  Standard object’s metadata. More info: <https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#metadata>  
+`spec` |  `object` |  BareMetalHostSpec defines the desired state of BareMetalHost.   
+`status` |  `object` |  BareMetalHostStatus defines the observed state of BareMetalHost.   
+Show more
+
+## 3.1.1. .spec
+
+Description
+     BareMetalHostSpec defines the desired state of BareMetalHost. 
+Type
+     `object`
+Required
+    
+
+  * `online`
+
+
+
+Property| Type| Description  
+---|---|---  
+`architecture` |  `string` |  CPU architecture of the host, e.g. "x86_64" or "aarch64". If unset, eventually populated by inspection.   
+`automatedCleaningMode` |  `string` |  When set to disabled, automated cleaning will be skipped during provisioning and deprovisioning.   
+`bmc` |  `object` |  How do we connect to the BMC (Baseboard Management Controller) on the host?   
+`bootMACAddress` |  `string` |  The MAC address of the NIC used for provisioning the host. In case of network boot, this is the MAC address of the PXE booting interface. The MAC address of the BMC must never be used here!   
+`bootMode` |  `string` |  Select the method of initializing the hardware during boot. Defaults to UEFI. Legacy boot should only be used for hardware that does not support UEFI correctly. Set to UEFISecureBoot to turn secure boot on automatically after provisioning.   
+`consumerRef` |  `object` |  ConsumerRef can be used to store information about something that is using a host. When it is not empty, the host is considered "in use". The common use case is a link to a Machine resource when the host is used by Cluster API.   
+`customDeploy` |  `object` |  A custom deploy procedure. This is an advanced feature that allows using a custom deploy step provided by a site-specific deployment ramdisk. Most users will want to use "image" instead. Setting this field triggers provisioning.   
+`description` |  `string` |  Description is a human-entered text used to help identify the host.   
+`disablePowerOff` |  `boolean` |  When set to true, power off of the node will be disabled, instead, a reboot will be used in place of power on/off   
+`externallyProvisioned` |  `boolean` |  ExternallyProvisioned means something else has provisioned the image running on the host, and the operator should only manage the power status. This field is used for integration with already provisioned hosts and when pivoting hosts between clusters.  This field can be set to true either: 1. During initial host creation (e.g., for pre-provisioned hosts) 2. After inspection completes when the host reaches Available state  When used in environments with Cluster API Provider Metal3 (CAPM3), ensure hosts are labeled appropriately so CAPM3’s host selector can distinguish them from CAPM3-managed hosts. If unsure, leave this field as false.   
+`firmware` |  `object` |  Firmware (BIOS) configuration for bare metal server. If set, the requested settings will be applied before the host is provisioned.  Deprecated: no longer supported by any driver. An alternative is to use HostFirmwareSettings resources that allow changing arbitrary values and support the generic Redfish-based drivers.   
+`hardwareProfile` |  `string` |  What is the name of the hardware profile for this host? Hardware profiles are deprecated and should not be used. Use the separate fields Architecture and RootDeviceHints instead. Set to "empty" to prepare for the future version of the API without hardware profiles.   
+`image` |  `object` |  Image holds the details of the image to be provisioned. Populating the image will cause the host to start provisioning.   
+`inspectionMode` |  `string` |  Specifies the mode for host inspection. "disabled" - no inspection will be performed "agent" - normal agent-based inspection will run   
+`metaData` |  `object` |  MetaData holds the reference to the Secret containing host metadata which is passed to the Config Drive. By default, metadata will be generated for the host, so most users do not need to set this field.   
+`networkData` |  `object` |  NetworkData holds the reference to the Secret containing network configuration which is passed to the Config Drive and interpreted by the first boot software such as cloud-init.   
+`online` |  `boolean` |  Should the host be powered on? If the host is currently in a stable state (e.g. provisioned), its power state will be forced to match this value.   
+`preprovisioningNetworkDataName` |  `string` |  PreprovisioningNetworkDataName is the name of the Secret in the local namespace containing network configuration which is passed to the preprovisioning image, and to the Config Drive if not overridden by specifying NetworkData.   
+`raid` |  `object` |  RAID configuration for bare metal server. If set, the RAID settings will be applied before the host is provisioned. If not, the current settings will not be modified. Only one of the sub-fields hardwareRAIDVolumes and softwareRAIDVolumes can be set at the same time.   
+`rootDeviceHints` |  `object` |  Provide guidance about how to choose the device for the image being provisioned. The default is currently to use /dev/sda as the root device.   
+`taints` |  `array` |  Taints is the full, authoritative list of taints to apply to the corresponding Machine. This list will overwrite any modifications made to the Machine on an ongoing basis.   
+`taints[]` |  `object` |  The node this Taint is attached to has the "effect" on any pod that does not tolerate the Taint.   
+`userData` |  `object` |  UserData holds the reference to the Secret containing the user data which is passed to the Config Drive and interpreted by the first-boot software such as cloud-init. The format of user data is specific to the first-boot software.   
+Show more
+
+## 3.1.2. .spec.bmc
+
+Description
+     How do we connect to the BMC (Baseboard Management Controller) on the host? 
+Type
+     `object`
+Required
+    
+
+  * `address`
+  * `credentialsName`
+
+
+
+Property| Type| Description  
+---|---|---  
+`address` |  `string` |  Address holds the URL for accessing the controller on the network. The scheme part designates the driver to use with the host.   
+`credentialsName` |  `string` |  The name of the secret containing the BMC credentials (requires keys "username" and "password").   
+`disableCertificateVerification` |  `boolean` |  DisableCertificateVerification disables verification of server certificates when using HTTPS to connect to the BMC. This is required when the server certificate is self-signed, but is insecure because it allows a man-in-the-middle to intercept the connection.   
+Show more
+
+## 3.1.3. .spec.consumerRef
+
+Description
+     ConsumerRef can be used to store information about something that is using a host. When it is not empty, the host is considered "in use". The common use case is a link to a Machine resource when the host is used by Cluster API. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`apiVersion` |  `string` |  API version of the referent.   
+`fieldPath` |  `string` |  If referring to a piece of an object instead of an entire object, this string should contain a valid JSON/Go field access statement, such as desiredState.manifest.containers[2]. For example, if the object reference is to a container within a pod, this would take on a value like: "spec.containers{name}" (where "name" refers to the name of the container that triggered the event) or if no container name is specified "spec.containers[2]" (container with index 2 in this pod). This syntax is chosen only to have some well-defined way of referencing a part of an object.   
+`kind` |  `string` |  Kind of the referent. More info: <https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds>  
+`name` |  `string` |  Name of the referent. More info: <https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names>  
+`namespace` |  `string` |  Namespace of the referent. More info: <https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/>  
+`resourceVersion` |  `string` |  Specific resourceVersion to which this reference is made, if any. More info: <https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency>  
+`uid` |  `string` |  UID of the referent. More info: <https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids>  
+Show more
+
+## 3.1.4. .spec.customDeploy
+
+Description
+     A custom deploy procedure. This is an advanced feature that allows using a custom deploy step provided by a site-specific deployment ramdisk. Most users will want to use "image" instead. Setting this field triggers provisioning. 
+Type
+     `object`
+Required
+    
+
+  * `method`
+
+
+
+Property| Type| Description  
+---|---|---  
+`method` |  `string` |  Custom deploy method name. This name is specific to the deploy ramdisk used. If you don’t have a custom deploy ramdisk, you shouldn’t use CustomDeploy.   
+Show more
+
+## 3.1.5. .spec.firmware
+
+Description
+    
+
+Firmware (BIOS) configuration for bare metal server. If set, the requested settings will be applied before the host is provisioned. 
+
+Deprecated: no longer supported by any driver. An alternative is to use HostFirmwareSettings resources that allow changing arbitrary values and support the generic Redfish-based drivers. 
+
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`simultaneousMultithreadingEnabled` |  `boolean` |  Allows a single physical processor core to appear as several logical processors.   
+`sriovEnabled` |  `boolean` |  SR-IOV support enables a hypervisor to create virtual instances of a PCI-express device, potentially increasing performance.   
+`virtualizationEnabled` |  `boolean` |  Supports the virtualization of platform hardware.   
+Show more
+
+## 3.1.6. .spec.image
+
+Description
+     Image holds the details of the image to be provisioned. Populating the image will cause the host to start provisioning. 
+Type
+     `object`
+Required
+    
+
+  * `url`
+
+
+
+Property| Type| Description  
+---|---|---  
+`checksum` |  `string` |  Checksum is the checksum for the image. Required for all formats except for "live-iso" and OCI images (oci://).   
+`checksumType` |  `string` |  ChecksumType is the checksum algorithm for the image, e.g md5, sha256 or sha512. The special value "auto" can be used to detect the algorithm from the checksum. If missing, MD5 is used. If in doubt, use "auto".   
+`format` |  `string` |  Format contains the format of the image (raw, qcow2, …​). When set to "live-iso", an ISO 9660 image referenced by the url will be live-booted and not deployed to disk.   
+`url` |  `string` |  URL is a location of an image to deploy.   
+Show more
+
+## 3.1.7. .spec.metaData
+
+Description
+     MetaData holds the reference to the Secret containing host metadata which is passed to the Config Drive. By default, metadata will be generated for the host, so most users do not need to set this field. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`name` |  `string` |  name is unique within a namespace to reference a secret resource.   
+`namespace` |  `string` |  namespace defines the space within which the secret name must be unique.   
+Show more
+
+## 3.1.8. .spec.networkData
+
+Description
+     NetworkData holds the reference to the Secret containing network configuration which is passed to the Config Drive and interpreted by the first boot software such as cloud-init. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`name` |  `string` |  name is unique within a namespace to reference a secret resource.   
+`namespace` |  `string` |  namespace defines the space within which the secret name must be unique.   
+Show more
+
+## 3.1.9. .spec.raid
+
+Description
+     RAID configuration for bare metal server. If set, the RAID settings will be applied before the host is provisioned. If not, the current settings will not be modified. Only one of the sub-fields hardwareRAIDVolumes and softwareRAIDVolumes can be set at the same time. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`hardwareRAIDVolumes` |  ``  |  The list of logical disks for hardware RAID, if rootDeviceHints isn’t used, first volume is root volume. You can set the value of this field to `[]` to clear all the hardware RAID configurations.   
+`softwareRAIDVolumes` |  ``  |  The list of logical disks for software RAID, if rootDeviceHints isn’t used, first volume is root volume. If HardwareRAIDVolumes is set this item will be invalid. The number of created Software RAID devices must be 1 or 2. If there is only one Software RAID device, it has to be a RAID-1. If there are two, the first one has to be a RAID-1, while the RAID level for the second one can be 0, 1, or 1+0. As the first RAID device will be the deployment device, enforcing a RAID-1 reduces the risk of ending up with a non-booting host in case of a disk failure. Software RAID will always be deleted.   
+Show more
+
+## 3.1.10. .spec.rootDeviceHints
+
+Description
+     Provide guidance about how to choose the device for the image being provisioned. The default is currently to use /dev/sda as the root device. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`deviceName` |  `string` |  A Linux device name like "/dev/vda", or a by-path link to it like "/dev/disk/by-path/pci-0000:01:00.0-scsi-0:2:0:0". The hint must match the actual value exactly.   
+`hctl` |  `string` |  A SCSI bus address like 0:0:0:0. The hint must match the actual value exactly.   
+`minSizeGigabytes` |  `integer` |  The minimum size of the device in Gigabytes.   
+`model` |  `string` |  A vendor-specific device identifier. The hint can be a substring of the actual value.   
+`rotational` |  `boolean` |  True if the device should use spinning media, false otherwise.   
+`serialNumber` |  `string` |  Device serial number. The hint must match the actual value exactly.   
+`vendor` |  `string` |  The name of the vendor or manufacturer of the device. The hint can be a substring of the actual value.   
+`wwn` |  `string` |  Unique storage identifier. The hint must match the actual value exactly.   
+`wwnVendorExtension` |  `string` |  Unique vendor storage identifier. The hint must match the actual value exactly.   
+`wwnWithExtension` |  `string` |  Unique storage identifier with the vendor extension appended. The hint must match the actual value exactly.   
+Show more
+
+## 3.1.11. .spec.taints
+
+Description
+     Taints is the full, authoritative list of taints to apply to the corresponding Machine. This list will overwrite any modifications made to the Machine on an ongoing basis. 
+Type
+     `array`
+
+## 3.1.12. .spec.taints[]
+
+Description
+     The node this Taint is attached to has the "effect" on any pod that does not tolerate the Taint. 
+Type
+     `object`
+Required
+    
+
+  * `effect`
+  * `key`
+
+
+
+Property| Type| Description  
+---|---|---  
+`effect` |  `string` |  Required. The effect of the taint on pods that do not tolerate the taint. Valid effects are NoSchedule, PreferNoSchedule and NoExecute.   
+`key` |  `string` |  Required. The taint key to be applied to a node.   
+`timeAdded` |  `string` |  TimeAdded represents the time at which the taint was added.   
+`value` |  `string` |  The taint value corresponding to the taint key.   
+Show more
+
+## 3.1.13. .spec.userData
+
+Description
+     UserData holds the reference to the Secret containing the user data which is passed to the Config Drive and interpreted by the first-boot software such as cloud-init. The format of user data is specific to the first-boot software. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`name` |  `string` |  name is unique within a namespace to reference a secret resource.   
+`namespace` |  `string` |  namespace defines the space within which the secret name must be unique.   
+Show more
+
+## 3.1.14. .status
+
+Description
+     BareMetalHostStatus defines the observed state of BareMetalHost. 
+Type
+     `object`
+Required
+    
+
+  * `errorCount`
+  * `errorMessage`
+  * `operationalStatus`
+  * `poweredOn`
+  * `provisioning`
+
+
+
+Property| Type| Description  
+---|---|---  
+`conditions` |  `array` |  Conditions defines current service state of the BareMetalHost.   
+`conditions[]` |  `object` |  Condition contains details for one aspect of the current state of this API Resource.   
+`errorCount` |  `integer` |  ErrorCount records how many times the host has encoutered an error since the last successful operation   
+`errorMessage` |  `string` |  The last error message reported by the provisioning subsystem.   
+`errorType` |  `string` |  ErrorType indicates the type of failure encountered when the OperationalStatus is OperationalStatusError   
+`goodCredentials` |  `object` |  The last credentials we were able to validate as working.   
+`hardware` |  `object` |  The hardware discovered to exist on the host. This field will be removed in the next API version in favour of the separate HardwareData resource.   
+`hardwareProfile` |  `string` |  The name of the profile matching the hardware details. Hardware profiles are deprecated and should not be relied on.   
+`lastUpdated` |  `string` |  LastUpdated identifies when this status was last observed.   
+`operationHistory` |  `object` |  OperationHistory holds information about operations performed on this host.   
+`operationalStatus` |  `string` |  OperationalStatus holds the status of the host   
+`poweredOn` |  `boolean` |  The currently detected power state of the host. This field may get briefly out of sync with the actual state of the hardware while provisioning processes are running.   
+`provisioning` |  `object` |  Information tracked by the provisioner.   
+`triedCredentials` |  `object` |  The last credentials we sent to the provisioning backend.   
+Show more
+
+## 3.1.15. .status.conditions
+
+Description
+     Conditions defines current service state of the BareMetalHost. 
+Type
+     `array`
+
+## 3.1.16. .status.conditions[]
+
+Description
+     Condition contains details for one aspect of the current state of this API Resource. 
+Type
+     `object`
+Required
+    
+
+  * `lastTransitionTime`
+  * `message`
+  * `reason`
+  * `status`
+  * `type`
+
+
+
+Property| Type| Description  
+---|---|---  
+`lastTransitionTime` |  `string` |  lastTransitionTime is the last time the condition transitioned from one status to another. This should be when the underlying condition changed. If that is not known, then using the time when the API field changed is acceptable.   
+`message` |  `string` |  message is a human readable message indicating details about the transition. This may be an empty string.   
+`observedGeneration` |  `integer` |  observedGeneration represents the .metadata.generation that the condition was set based upon. For instance, if .metadata.generation is currently 12, but the .status.conditions[x].observedGeneration is 9, the condition is out of date with respect to the current state of the instance.   
+`reason` |  `string` |  reason contains a programmatic identifier indicating the reason for the condition’s last transition. Producers of specific condition types may define expected values and meanings for this field, and whether the values are considered a guaranteed API. The value should be a CamelCase string. This field may not be empty.   
+`status` |  `string` |  status of the condition, one of True, False, Unknown.   
+`type` |  `string` |  type of condition in CamelCase or in foo.example.com/CamelCase.   
+Show more
+
+## 3.1.17. .status.goodCredentials
+
+Description
+     The last credentials we were able to validate as working. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`credentials` |  `object` |  SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace   
+`credentialsVersion` |  `string` |   
+Show more
+
+## 3.1.18. .status.goodCredentials.credentials
+
+Description
+     SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`name` |  `string` |  name is unique within a namespace to reference a secret resource.   
+`namespace` |  `string` |  namespace defines the space within which the secret name must be unique.   
+Show more
+
+## 3.1.19. .status.hardware
+
+Description
+     The hardware discovered to exist on the host. This field will be removed in the next API version in favour of the separate HardwareData resource. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`cpu` |  `object` |  Details of the CPU(s) in the system.   
+`firmware` |  `object` |  System firmware information.   
+`hostname` |  `string` |  Name of the host at the inspection time.   
+`nics` |  `array` |  List of network interfaces for the host.   
+`nics[]` |  `object` |  NIC describes one network interface on the host.   
+`ramMebibytes` |  `integer` |  The host’s amount of memory in Mebibytes.   
+`storage` |  `array` |  List of storage (disk, SSD, etc.) available to the host.   
+`storage[]` |  `object` |  Storage describes one storage device (disk, SSD, etc.) on the host.   
+`systemVendor` |  `object` |  System vendor information.   
+Show more
+
+## 3.1.20. .status.hardware.cpu
+
+Description
+     Details of the CPU(s) in the system. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`arch` |  `string` |   
+`clockMegahertz` |  `number` |  ClockSpeed is a clock speed in MHz   
+`count` |  `integer` |   
+`flags` |  `array (string)` |   
+`model` |  `string` |   
+Show more
+
+## 3.1.21. .status.hardware.firmware
+
+Description
+     System firmware information. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`bios` |  `object` |  The BIOS for this firmware   
+Show more
+
+## 3.1.22. .status.hardware.firmware.bios
+
+Description
+     The BIOS for this firmware 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`date` |  `string` |  The release/build date for this BIOS   
+`vendor` |  `string` |  The vendor name for this BIOS   
+`version` |  `string` |  The version of the BIOS   
+Show more
+
+## 3.1.23. .status.hardware.nics
+
+Description
+     List of network interfaces for the host. 
+Type
+     `array`
+
+## 3.1.24. .status.hardware.nics[]
+
+Description
+     NIC describes one network interface on the host. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`ip` |  `string` |  The IP address of the interface. This will be an IPv4 or IPv6 address if one is present. If both IPv4 and IPv6 addresses are present in a dual-stack environment, two nics will be output, one with each IP.   
+`lldp` |  `object` |  LLDP data for this interface   
+`mac` |  `string` |  The device MAC address   
+`model` |  `string` |  The vendor and product IDs of the NIC, e.g. "0x8086 0x1572"   
+`name` |  `string` |  The name of the network interface, e.g. "en0"   
+`pciAddress` |  `string` |  The NIC PCI address   
+`pxe` |  `boolean` |  Whether the NIC is PXE Bootable   
+`speedGbps` |  `integer` |  The speed of the device in Gigabits per second   
+`vlanId` |  `integer` |  The untagged VLAN ID   
+`vlans` |  `array` |  The VLANs available   
+`vlans[]` |  `object` |  VLAN represents the name and ID of a VLAN.   
+Show more
+
+## 3.1.25. .status.hardware.nics[].lldp
+
+Description
+     LLDP data for this interface 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`portID` |  `string` |  The switch port ID from LLDP   
+`switchID` |  `string` |  The switch chassis ID from LLDP   
+`switchSystemName` |  `string` |  The switch system name from LLDP   
+Show more
+
+## 3.1.26. .status.hardware.nics[].vlans
+
+Description
+     The VLANs available 
+Type
+     `array`
+
+## 3.1.27. .status.hardware.nics[].vlans[]
+
+Description
+     VLAN represents the name and ID of a VLAN. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`id` |  `integer` |  VLANID is a 12-bit 802.1Q VLAN identifier   
+`name` |  `string` |   
+Show more
+
+## 3.1.28. .status.hardware.storage
+
+Description
+     List of storage (disk, SSD, etc.) available to the host. 
+Type
+     `array`
+
+## 3.1.29. .status.hardware.storage[]
+
+Description
+     Storage describes one storage device (disk, SSD, etc.) on the host. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`alternateNames` |  `array (string)` |  A list of alternate Linux device names of the disk, e.g. "/dev/sda". Note that this list is not exhaustive, and names may not be stable across reboots.   
+`hctl` |  `string` |  The SCSI location of the device   
+`model` |  `string` |  Hardware model   
+`name` |  `string` |  A Linux device name of the disk, e.g. "/dev/disk/by-path/pci-0000:01:00.0-scsi-0:2:0:0". This will be a name that is stable across reboots if one is available.   
+`rotational` |  `boolean` |  Whether this disk represents rotational storage. This field is not recommended for usage, please prefer using 'Type' field instead, this field will be deprecated eventually.   
+`serialNumber` |  `string` |  The serial number of the device   
+`sizeBytes` |  `integer` |  The size of the disk in Bytes   
+`type` |  `string` |  Device type, one of: HDD, SSD, NVME.   
+`vendor` |  `string` |  The name of the vendor of the device   
+`wwn` |  `string` |  The WWN of the device   
+`wwnVendorExtension` |  `string` |  The WWN Vendor extension of the device   
+`wwnWithExtension` |  `string` |  The WWN with the extension   
+Show more
+
+## 3.1.30. .status.hardware.systemVendor
+
+Description
+     System vendor information. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`manufacturer` |  `string` |   
+`productName` |  `string` |   
+`serialNumber` |  `string` |   
+Show more
+
+## 3.1.31. .status.operationHistory
+
+Description
+     OperationHistory holds information about operations performed on this host. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`deprovision` |  `object` |  OperationMetric contains metadata about an operation (inspection, provisioning, etc.) used for tracking metrics.   
+`inspect` |  `object` |  OperationMetric contains metadata about an operation (inspection, provisioning, etc.) used for tracking metrics.   
+`provision` |  `object` |  OperationMetric contains metadata about an operation (inspection, provisioning, etc.) used for tracking metrics.   
+`register` |  `object` |  OperationMetric contains metadata about an operation (inspection, provisioning, etc.) used for tracking metrics.   
+Show more
+
+## 3.1.32. .status.operationHistory.deprovision
+
+Description
+     OperationMetric contains metadata about an operation (inspection, provisioning, etc.) used for tracking metrics. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`end` |  ``  |   
+`start` |  ``  |   
+Show more
+
+## 3.1.33. .status.operationHistory.inspect
+
+Description
+     OperationMetric contains metadata about an operation (inspection, provisioning, etc.) used for tracking metrics. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`end` |  ``  |   
+`start` |  ``  |   
+Show more
+
+## 3.1.34. .status.operationHistory.provision
+
+Description
+     OperationMetric contains metadata about an operation (inspection, provisioning, etc.) used for tracking metrics. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`end` |  ``  |   
+`start` |  ``  |   
+Show more
+
+## 3.1.35. .status.operationHistory.register
+
+Description
+     OperationMetric contains metadata about an operation (inspection, provisioning, etc.) used for tracking metrics. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`end` |  ``  |   
+`start` |  ``  |   
+Show more
+
+## 3.1.36. .status.provisioning
+
+Description
+     Information tracked by the provisioner. 
+Type
+     `object`
+Required
+    
+
+  * `ID`
+  * `state`
+
+
+
+Property| Type| Description  
+---|---|---  
+`ID` |  `string` |  The hosts’s ID from the underlying provisioning tool (e.g. the Ironic node UUID).   
+`bootMode` |  `string` |  BootMode indicates the boot mode used to provision the host.   
+`customDeploy` |  `object` |  Custom deploy procedure applied to the host.   
+`firmware` |  `object` |  The firmware settings that have been applied.   
+`image` |  `object` |  Image holds the details of the last image successfully provisioned to the host.   
+`raid` |  `object` |  The RAID configuration that has been applied.   
+`rootDeviceHints` |  `object` |  The root device hints used to provision the host.   
+`state` |  `string` |  An indicator for what the provisioner is doing with the host.   
+Show more
+
+## 3.1.37. .status.provisioning.customDeploy
+
+Description
+     Custom deploy procedure applied to the host. 
+Type
+     `object`
+Required
+    
+
+  * `method`
+
+
+
+Property| Type| Description  
+---|---|---  
+`method` |  `string` |  Custom deploy method name. This name is specific to the deploy ramdisk used. If you don’t have a custom deploy ramdisk, you shouldn’t use CustomDeploy.   
+Show more
+
+## 3.1.38. .status.provisioning.firmware
+
+Description
+     The firmware settings that have been applied. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`simultaneousMultithreadingEnabled` |  `boolean` |  Allows a single physical processor core to appear as several logical processors.   
+`sriovEnabled` |  `boolean` |  SR-IOV support enables a hypervisor to create virtual instances of a PCI-express device, potentially increasing performance.   
+`virtualizationEnabled` |  `boolean` |  Supports the virtualization of platform hardware.   
+Show more
+
+## 3.1.39. .status.provisioning.image
+
+Description
+     Image holds the details of the last image successfully provisioned to the host. 
+Type
+     `object`
+Required
+    
+
+  * `url`
+
+
+
+Property| Type| Description  
+---|---|---  
+`checksum` |  `string` |  Checksum is the checksum for the image. Required for all formats except for "live-iso" and OCI images (oci://).   
+`checksumType` |  `string` |  ChecksumType is the checksum algorithm for the image, e.g md5, sha256 or sha512. The special value "auto" can be used to detect the algorithm from the checksum. If missing, MD5 is used. If in doubt, use "auto".   
+`format` |  `string` |  Format contains the format of the image (raw, qcow2, …​). When set to "live-iso", an ISO 9660 image referenced by the url will be live-booted and not deployed to disk.   
+`url` |  `string` |  URL is a location of an image to deploy.   
+Show more
+
+## 3.1.40. .status.provisioning.raid
+
+Description
+     The RAID configuration that has been applied. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`hardwareRAIDVolumes` |  ``  |  The list of logical disks for hardware RAID, if rootDeviceHints isn’t used, first volume is root volume. You can set the value of this field to `[]` to clear all the hardware RAID configurations.   
+`softwareRAIDVolumes` |  ``  |  The list of logical disks for software RAID, if rootDeviceHints isn’t used, first volume is root volume. If HardwareRAIDVolumes is set this item will be invalid. The number of created Software RAID devices must be 1 or 2. If there is only one Software RAID device, it has to be a RAID-1. If there are two, the first one has to be a RAID-1, while the RAID level for the second one can be 0, 1, or 1+0. As the first RAID device will be the deployment device, enforcing a RAID-1 reduces the risk of ending up with a non-booting host in case of a disk failure. Software RAID will always be deleted.   
+Show more
+
+## 3.1.41. .status.provisioning.rootDeviceHints
+
+Description
+     The root device hints used to provision the host. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`deviceName` |  `string` |  A Linux device name like "/dev/vda", or a by-path link to it like "/dev/disk/by-path/pci-0000:01:00.0-scsi-0:2:0:0". The hint must match the actual value exactly.   
+`hctl` |  `string` |  A SCSI bus address like 0:0:0:0. The hint must match the actual value exactly.   
+`minSizeGigabytes` |  `integer` |  The minimum size of the device in Gigabytes.   
+`model` |  `string` |  A vendor-specific device identifier. The hint can be a substring of the actual value.   
+`rotational` |  `boolean` |  True if the device should use spinning media, false otherwise.   
+`serialNumber` |  `string` |  Device serial number. The hint must match the actual value exactly.   
+`vendor` |  `string` |  The name of the vendor or manufacturer of the device. The hint can be a substring of the actual value.   
+`wwn` |  `string` |  Unique storage identifier. The hint must match the actual value exactly.   
+`wwnVendorExtension` |  `string` |  Unique vendor storage identifier. The hint must match the actual value exactly.   
+`wwnWithExtension` |  `string` |  Unique storage identifier with the vendor extension appended. The hint must match the actual value exactly.   
+Show more
+
+## 3.1.42. .status.triedCredentials
+
+Description
+     The last credentials we sent to the provisioning backend. 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`credentials` |  `object` |  SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace   
+`credentialsVersion` |  `string` |   
+Show more
+
+## 3.1.43. .status.triedCredentials.credentials
+
+Description
+     SecretReference represents a Secret Reference. It has enough information to retrieve secret in any namespace 
+Type
+     `object`
+
+Property| Type| Description  
+---|---|---  
+`name` |  `string` |  name is unique within a namespace to reference a secret resource.   
+`namespace` |  `string` |  namespace defines the space within which the secret name must be unique.   
+Show more
