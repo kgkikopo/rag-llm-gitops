@@ -168,8 +168,12 @@ chunks and citations.
 
 ### GPU-assisted population
 
-For a one-time GPU rebuild, stop vLLM and verify that a GPU is allocatable. Enable
-`populateDbJob.enabled` and `populateDbJob.gpu.enabled` in the RAG Helm values.
+The hub configuration declares a GPU rebuild in `variants/hub/values-hub.yaml`.
+Keep vLLM stopped and verify that one GPU is allocatable. When GitOps reconciles
+the hub and RAG application, it creates `populate-vectordb-rag-llm-ocp-4-22-gpu-1`.
+The completed Job remains in place, so routine syncs do not repeat the rebuild.
+To intentionally rerun or change Job settings, change `populateDbJob.runId` in Git.
+The chart also supports a Sync hook when enabled with an empty run ID.
 The job requests one NVIDIA GPU and runs a CUDA model warm-up before opening PostgreSQL.
 `populateDbJob.embeddingBatchSize` controls encoder batch size and defaults to 32. If CUDA runs out of memory, set it to 16.
 The job reports embedding, bulk COPY, and final publication timings separately.

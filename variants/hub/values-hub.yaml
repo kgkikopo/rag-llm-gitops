@@ -67,6 +67,18 @@ clusterGroup:
       name: rag-llm
       namespace: rag-llm
       path: charts/all/rag-llm
+      syncPolicy:
+        automated:
+          selfHeal: true
+      overrides:
+        - name: populateDbJob.enabled
+          value: "true"
+        - name: populateDbJob.gpu.enabled
+          value: "true"
+        - name: populateDbJob.embeddingBatchSize
+          value: "32"
+        - name: populateDbJob.runId
+          value: ocp-4-22-gpu-1
     nfd-config:
       name: nfd-config
       namespace: openshift-cfd

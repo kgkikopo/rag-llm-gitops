@@ -1,13 +1,19 @@
 {{- if and .Values.populateDbJob .Values.populateDbJob.enabled }}
+{{- $name := printf "populate-vectordb-%s" (include "rag-llm.fullname" .) }}
+{{- with .Values.populateDbJob.runId }}
+{{- $name = printf "%s-%s" ($name | trunc (sub 62 (len .) | int) | trimSuffix "-") . }}
+{{- end }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name:  populate-vectordb-{{ include "rag-llm.fullname" . }}
+  name: {{ $name }}
   labels:
     {{- include "rag-llm.labels" . | nindent 4 }}
+  {{- if not .Values.populateDbJob.runId }}
   annotations:
     argocd.argoproj.io/hook: Sync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+  {{- end }}
 spec:
   template:
     metadata:

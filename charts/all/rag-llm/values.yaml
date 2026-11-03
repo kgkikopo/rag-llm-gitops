@@ -161,6 +161,8 @@ route:
 
 populateDbJob:
   enabled: false
+  # A run ID creates a persistent Job. Change it in Git to start another run.
+  runId: ""
   ## Job image
   image:
     repository: quay.io/hybridcloudpatterns/vector-embedder
