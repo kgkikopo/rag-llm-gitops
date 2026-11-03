@@ -46,6 +46,21 @@ def load_model(device):
     return model, len(sample[0])
 
 
+def encode_batch(model, texts):
+    try:
+        return list(model.encode(texts, batch_size=len(texts), show_progress_bar=False))
+    except torch.OutOfMemoryError:
+        if model.device.type != "cuda" or len(texts) == 1:
+            raise
+
+    # Leave the exception handler before retrying so its traceback can release tensors.
+    torch.cuda.empty_cache()
+    middle = len(texts) // 2
+    logger.warning("CUDA out of memory for %d chunks. Retrying in groups of %d and %d.",
+                   len(texts), middle, len(texts) - middle)
+    return encode_batch(model, texts[:middle]) + encode_batch(model, texts[middle:])
+
+
 def publish_index(conn, table_name, model, dimensions, docs, batch_size):
     table = sql.Identifier("public", table_name)
     staging = sql.Identifier("pg_temp", "portal_snapshot_stage")
@@ -66,8 +81,7 @@ def publish_index(conn, table_name, model, dimensions, docs, batch_size):
             batch = docs[offset:offset + batch_size]
             texts = [doc.page_content.replace("\x00", "") for doc in batch]
             start = time.monotonic()
-            vectors = model.encode(texts,
-                                   batch_size=batch_size, show_progress_bar=False)
+            vectors = encode_batch(model, texts)
             embed_elapsed = time.monotonic() - start
             start = time.monotonic()
             with cursor.copy(copy_query) as copy:
