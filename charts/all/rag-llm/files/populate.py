@@ -66,7 +66,7 @@ def publish_index(conn, table_name, model, dimensions, docs, batch_size):
             batch = docs[offset:offset + batch_size]
             texts = [doc.page_content.replace("\x00", "") for doc in batch]
             start = time.monotonic()
-            vectors = model.encode([text.replace("\n", " ") for text in texts],
+            vectors = model.encode(texts,
                                    batch_size=batch_size, show_progress_bar=False)
             embed_elapsed = time.monotonic() - start
             start = time.monotonic()
