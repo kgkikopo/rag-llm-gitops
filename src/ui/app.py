@@ -143,7 +143,7 @@ def get_doc_title(source_path: str, content: str = "") -> str:
     return fname.replace("-", " ").replace("_", " ").title()
 
 # --- Retrieval Function ---
-def retrieve_docs(query: str, top_k: int = 10):
+def retrieve_docs(query: str, top_k: int = 6):
     """Embeds query and queries PGVector for top matching documentation snippets."""
     try:
         model = get_embed_model()
