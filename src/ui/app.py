@@ -270,7 +270,8 @@ DEFAULT_SYSTEM_PROMPT = (
     "Guidelines:\n"
     "1. Use `search_openshift_docs` for technical questions regarding OpenShift, Kubernetes, cluster configuration, networking, storage, security, and operators.\n"
     "2. For general greetings, conversational remarks, or questions unrelated to OpenShift/Kubernetes, respond politely and directly without calling tools.\n"
-    "3. When documentation is retrieved, ground your answer strictly in that context. Provide exact CLI commands (`oc ...`) and valid YAML manifests where applicable."
+    "3. Use separate targeted searches for distinct subquestions when needed. If results are missing, incomplete, or off-topic, search again with a more specific or differently phrased query.\n"
+    "4. When documentation is retrieved, ground your answer strictly in that context. Provide exact CLI commands (`oc ...`) and valid YAML manifests where applicable."
 )
 
 # --- Tool Definitions (OpenAI Standard Schema) ---
@@ -535,6 +536,62 @@ def call_llm_stream(messages: list[dict], max_tokens: int | None = None):
     except Exception as e:
         yield f"\n\n[Error] LLM streaming failed: {e}"
 
+def search_tool_result(name: str, raw_args: str) -> dict:
+    if name != "search_openshift_docs":
+        return {"results": [], "error": f"Unknown tool: {name}"}
+    try:
+        args = json.loads(raw_args)
+    except (TypeError, ValueError):
+        return {"results": [], "error": "Tool arguments must be valid JSON."}
+    query = args.get("query") if isinstance(args, dict) else None
+    if not isinstance(query, str) or not query.strip():
+        return {"results": [], "error": "query must be a non-empty string."}
+
+    docs, error = retrieve_docs(query, top_k=4)
+    results = []
+    for doc in docs:
+        source = doc["source"]
+        content = doc["content"]
+        results.append({
+            "heading_path": doc.get("heading_path") or get_doc_title(source, content),
+            "source_url": doc.get("source_url") or get_live_doc_url(source),
+            "content": content,
+            "path": doc.get("path") or source.split("@")[-1],
+            "distance": doc["distance"],
+        })
+    return {"results": results, "error": error}
+
+
+def render_tool_trace(call: dict, result: dict | None) -> str:
+    function = call["function"]
+    status = "Searching…" if result is None else f"{len(result['results'])} chunks returned"
+    call_text = (
+        f"Call ID: {call['id']}\nFunction: {function['name']}\n"
+        f"Arguments: {function['arguments']}"
+    )
+    parts = [f"<p><strong>{escape(status)}</strong></p><pre>{escape(call_text)}</pre>"]
+    if result is not None:
+        if result["error"]:
+            parts.append(f"<p>{escape(result['error'])}</p>")
+        for match in result["results"]:
+            url = escape(match["source_url"])
+            parts.append(
+                f'<div><a href="{url}" target="_blank" rel="noopener noreferrer">'
+                f"{escape(match['heading_path'])}</a><br>"
+                f'<a href="{url}" target="_blank" rel="noopener noreferrer">{url}</a>'
+                f"<pre>{escape(match['content'])}</pre></div>"
+            )
+    return "".join(parts)
+
+
+def render_tool_panel(traces: list[str]) -> str:
+    return (
+        '<details style="margin-bottom: 12px;">'
+        f"<summary>Documentation tool calls ({len(traces)})</summary>"
+        f"{'<hr>'.join(traces)}</details>"
+    )
+
+
 # --- Chat Assistant Logic ---
 def chat_respond(user_message: str, chat_history: list):
     history = list(chat_history) if chat_history else []
@@ -590,133 +647,46 @@ def chat_respond(user_message: str, chat_history: list):
         yield "", history
         return
 
-    # 3. LLM called search_openshift_docs tool
-    tc = tool_calls[0]
-    raw_args = tc.get("function", {}).get("arguments", "{}")
-    if isinstance(raw_args, dict):
-        target_query = raw_args.get("query", clean_user)
-    else:
-        try:
-            target_query = json.loads(raw_args).get("query", clean_user)
-        except Exception:
-            target_query = clean_user
+    # Return a tool message for every call in the assistant response.
+    assistant_call = {"role": "assistant", "content": accumulated_direct or None,
+                      "tool_calls": tool_calls}
+    tool_messages = []
+    traces = []
+    sources = {}
+    for call in tool_calls:
+        function = call["function"]
+        raw_args = function["arguments"]
+        traces.append(render_tool_trace(call, None))
+        history[-1] = {"role": "assistant", "content": render_tool_panel(traces)}
+        yield "", history
 
-    tool_initial = (
-        f'<details style="margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
-        f'<summary style="cursor: pointer; font-size: 12px; font-weight: 500; color: #94a3b8; list-style: none; display: inline-flex; align-items: center; gap: 5px; user-select: none;">'
-        f'<span style="font-size: 10px;">&#x25BE;</span> Searching OpenShift 4.22 documentation for "{target_query}"...'
-        f'</summary>\n'
-        f'</details>\n'
-        f'<div style="border-top: 1px solid #f1f5f9; width: 100%; margin-bottom: 12px;"></div>'
-    )
-    history[-1] = {"role": "assistant", "content": tool_initial}
+        result = search_tool_result(function["name"], raw_args)
+        traces[-1] = render_tool_trace(call, result)
+        tool_messages.append({
+            "role": "tool",
+            "tool_call_id": call["id"],
+            "content": json.dumps(result, ensure_ascii=False),
+        })
+        for match in result["results"]:
+            sources[match["source_url"]] = match["heading_path"]
+
+    full_response = render_tool_panel(traces) + "\n\n"
+    for chunk in call_llm_stream([*messages, assistant_call, *tool_messages]):
+        full_response += chunk
+        history[-1] = {"role": "assistant", "content": full_response}
+        yield "", history
+
+    if sources:
+        links = [
+            f'• <a href="{escape(url)}" target="_blank" rel="noopener noreferrer">{escape(title)}</a>'
+            for url, title in sorted(sources.items(), key=lambda item: item[1])
+        ]
+        full_response += "\n\n---\n**Official OpenShift 4.22 Documentation Sources:**\n" + "<br>".join(links)
+    else:
+        full_response += "\n\n---\n*(Note: Generated from base model knowledge &mdash; official documentation references currently unavailable)*"
+    history[-1] = {"role": "assistant", "content": full_response}
     yield "", history
 
-    docs, error_msg = retrieve_docs(target_query, top_k=4)
-
-    if docs:
-        snippets_html = []
-        context_blocks = []
-        sources_map = {}
-
-        for idx, doc in enumerate(docs, 1):
-            src = doc.get("source", "Unknown")
-            content = doc.get("content", "")
-            dist = doc.get("distance", 0.0)
-            score = max(0.0, 1.0 - dist)
-            title = doc.get("heading_path") or get_doc_title(src, content)
-            url = doc.get("source_url") or get_live_doc_url(src)
-            sources_map[url] = title
-
-            escaped_content = (
-                content.replace("&", "&amp;")
-                       .replace("<", "&lt;")
-                       .replace(">", "&gt;")
-            )
-            clean_src_path = doc.get("path") or src.split("@")[-1]
-            border_style = 'border-top: 1px solid #e2e8f0; padding-top: 12px;' if idx > 1 else ''
-
-            snippets_html.append(
-                f'<div style="margin-top: 12px; {border_style}">'
-                f'<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">'
-                f'<a href="{escape(url)}" target="_blank" rel="noopener noreferrer" style="font-weight: 600; color: #0284c7; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">'
-                f'{escape(title)} <span style="font-size: 10px; opacity: 0.7;">&#x2197;</span></a>'
-                f'<span style="font-size: 11px; font-family: monospace; color: #64748b; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">{score*100:.0f}% relevance</span>'
-                f'</div>'
-                f'<div style="font-size: 10px; font-family: monospace; color: #94a3b8; margin-bottom: 6px;">{escape(clean_src_path)}</div>'
-                f'<pre style="font-size: 11px; font-family: monospace; color: #334155; background: #f8fafc; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0; white-space: pre-wrap; word-break: break-word; line-height: 1.5; margin: 0;">{escaped_content}</pre>'
-                f'</div>'
-            )
-            context_blocks.append(f"--- Document [{title}] ({clean_src_path}) ---\n{content}")
-
-        tool_card = (
-            f'<details style="margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
-            f'<summary style="cursor: pointer; font-size: 12px; font-weight: 500; color: #64748b; list-style: none; display: inline-flex; align-items: center; gap: 5px; user-select: none;">'
-            f'<span style="font-size: 10px;">&#x25BE;</span> Searched {len(docs)} OpenShift 4.22 documentation sources'
-            f'</summary>\n'
-            f'<div style="margin-top: 8px; margin-left: 12px; padding-left: 12px; border-left: 2px solid #e2e8f0;">\n'
-            f"{''.join(snippets_html)}\n"
-            f'</div>\n'
-            f'</details>\n'
-            f'<div style="border-top: 1px solid #f1f5f9; width: 100%; margin-bottom: 12px;"></div>'
-        )
-
-        context_str = "\n\n".join(context_blocks)
-        augmented_prompt = (
-            f"[Official OpenShift 4.22 Documentation Tool Output for '{target_query}']:\n{context_str}\n\n"
-            f"User Question: {clean_user}"
-        )
-        # Replace the last user message with augmented prompt
-        augmented_messages = list(messages[:-1])
-        augmented_messages.append({"role": "user", "content": augmented_prompt})
-
-        # Stream grounded response from vLLM
-        full_response = tool_card + "\n\n"
-        for chunk in call_llm_stream(augmented_messages):
-            full_response += chunk
-            history[-1] = {"role": "assistant", "content": full_response}
-            yield "", history
-
-        # Append source references with live links at the end
-        sources_links = [
-            f'• <a href="{escape(url)}" target="_blank" rel="noopener noreferrer" style="color: #0284c7; text-decoration: underline;">{escape(title)}</a>'
-            for url, title in sorted(sources_map.items(), key=lambda item: item[1])
-        ]
-        sources_section = "<br>".join(sources_links)
-        final_answer = f"{full_response}\n\n---\n**Official OpenShift 4.22 Documentation Sources:**\n\n{sources_section}"
-        history[-1] = {"role": "assistant", "content": final_answer}
-        yield "", history
-
-    else:
-        # Fallback if no documents found or error occurred
-        no_docs_explanation = (
-            error_msg or
-            f"The documentation search returned 0 matching chunks from collection '{COLLECTION_NAME}'. "
-            f"This occurs if the ingestion job is still indexing or no chunks met the retrieval threshold."
-        )
-        tool_card = (
-            f'<details style="margin-bottom: 12px; font-family: system-ui, -apple-system, sans-serif;">\n'
-            f'<summary style="cursor: pointer; font-size: 12px; font-weight: 500; color: #64748b; list-style: none; display: inline-flex; align-items: center; gap: 5px; user-select: none;">'
-            f'<span style="font-size: 10px;">&#x25BE;</span> No documentation matches found'
-            f'</summary>\n'
-            f'<div style="margin-top: 8px; margin-left: 12px; padding-left: 12px; border-left: 2px solid #e2e8f0; font-size: 11px; color: #64748b; line-height: 1.5;">\n'
-            f'{no_docs_explanation}\n'
-            f'</div>\n'
-            f'</details>\n'
-            f'<div style="border-top: 1px solid #f1f5f9; width: 100%; margin-bottom: 12px;"></div>'
-        )
-        full_response = tool_card + "\n\n"
-        for chunk in call_llm_stream(messages):
-            full_response += chunk
-            history[-1] = {"role": "assistant", "content": full_response}
-            yield "", history
-
-        fallback_footer = (
-            f"\n\n---\n*(Note: Generated from base model knowledge &mdash; official documentation references currently unavailable)*"
-        )
-        final_answer = f"{full_response}{fallback_footer}"
-        history[-1] = {"role": "assistant", "content": final_answer}
-        yield "", history
 
 # --- Comparison Logic ---
 def compare_query(query: str):
@@ -742,7 +712,7 @@ def compare_query(query: str):
             url = doc.get("source_url") or get_live_doc_url(src)
             sources_map[url] = title
             clean_path = doc.get("path") or src.split("@")[-1]
-            context_blocks.append(f"[{idx}] {title} ({clean_path}):\n{cnt}")
+            context_blocks.append(f"[{idx}] {title} ({clean_path})\nSource URL: {url}\n{cnt}")
 
         context_str = "\n\n".join(context_blocks)
         rag_messages = [
