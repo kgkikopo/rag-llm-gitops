@@ -171,7 +171,7 @@ chunks and citations.
 For a one-time GPU rebuild, stop vLLM and verify that a GPU is allocatable. Enable
 `populateDbJob.enabled` and `populateDbJob.gpu.enabled` in the RAG Helm values.
 The job requests one NVIDIA GPU and runs a CUDA model warm-up before opening PostgreSQL.
-`populateDbJob.embeddingBatchSize` controls encoder batch size and defaults to 64. If CUDA runs out of memory, set it to 32.
+`populateDbJob.embeddingBatchSize` controls encoder batch size and defaults to 32. If CUDA runs out of memory, set it to 16.
 The job reports embedding, bulk COPY, and final publication timings separately.
 
 The population job stages the full index in PostgreSQL and publishes it in one

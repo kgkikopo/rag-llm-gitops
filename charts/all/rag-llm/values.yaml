@@ -178,7 +178,7 @@ populateDbJob:
   # When enabled, reserve one GPU for the whole population job.
   gpu:
     enabled: false
-  embeddingBatchSize: 64
+  embeddingBatchSize: 32
 
   # Environment overrides
   tempDir: /docs
